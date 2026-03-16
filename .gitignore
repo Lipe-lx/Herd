@@ -1,0 +1,12 @@
+# Herd — agent workspace
+.herd/
+.env
+config.json
+members.json
+invite_tokens.json
+cron_tasks.json
+cron_history.json
+.venv/
+.agent/
+__pycache__/
+*.pyc

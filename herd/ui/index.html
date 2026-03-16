@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Herd Setup</title>
+    <link rel="stylesheet" href="/herd.css">
+    <style>
+        .hidden { display: none; }
+        .step-panel { margin-top: 20px; }
+        .steps { display: flex; gap: 10px; margin-bottom: 20px; }
+        .step { width: 30px; height: 30px; border-radius: 50%; background: #D4C9B0; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .step.active { background: var(--herd-brown); }
+        .bootstrap-banner { background: #EAF3DE; border: 1px solid #CEE8B4; padding: 12px 16px; border-radius: var(--herd-radius); margin-bottom: 15px; font-size: 0.9em; color: var(--herd-green); }
+        .help-text { font-size: 0.85em; color: #777; margin-top: 4px; }
+        .hint-card { margin: 16px 0 18px; padding: 16px; border-radius: var(--herd-radius); border: 1px solid var(--herd-border); background: rgba(255,255,255,0.75); }
+        .hint-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+        .hint-actions button { padding: 8px 14px; font-size: 14px; }
+        .status-list { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 8px; }
+        .status-item { padding: 10px 12px; border-radius: 8px; font-size: 0.9em; border: 1px solid transparent; }
+        .status-item.ok { background: #EAF3DE; color: #47612C; border-color: #CDE2B7; }
+        .status-item.warn { background: #FCEBEB; color: #A32D2D; border-color: #F1CACA; }
+        .inline-note { font-size: 0.9em; color: #666; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <div style="text-align: center; margin-bottom: 20px;">
+        <img src="/logo.png" alt="Herd Logo" class="logo">
+    </div>
+
+    <div class="steps">
+        <span class="step active" data-step="1">1</span>
+        <span class="step" data-step="2">2</span>
+        <span class="step" data-step="3">3</span>
+    </div>
+
+    <!-- STEP 1: Token OR Bootstrap detection -->
+    <section id="step-1" class="step-panel active">
+        <div id="loading-check" style="text-align:center; padding: 20px; color: #888;">
+            Checking environment...
+        </div>
+        <div id="token-section" class="hidden">
+            <h2>Invite Token</h2>
+            <p>Welcome to Herd. Paste the invite token you received:</p>
+            <input id="token-input" type="text" placeholder="herd-" autocomplete="off" autofocus>
+            <div id="token-feedback" class="hidden"></div>
+            <button id="btn-step1" disabled>Continue →</button>
+        </div>
+        <div id="bootstrap-section" class="hidden">
+            <h2>Welcome, Owner!</h2>
+            <div class="bootstrap-banner">
+                🐄 This is a fresh Herd install. You will be set up as the <strong>OWNER</strong> of this group — no invite token needed.
+            </div>
+            <button id="btn-bootstrap-next">Continue →</button>
+        </div>
+    </section>
+
+    <!-- STEP 2: Agent & Telegram config -->
+    <section id="step-2" class="step-panel hidden">
+        <h2>Configuration</h2>
+        <div id="config-banner" class="bootstrap-banner hidden" style="background:#F5F0E4; border-color:#E5D7B7; color:#6A5434;"></div>
+        <div id="machine-hints" class="hint-card hidden">
+            <h3 style="margin-top: 0; margin-bottom: 8px;">Quick Fill For This Machine</h3>
+            <p id="machine-summary" style="margin: 0;"></p>
+            <p id="detected-agents" class="inline-note"></p>
+            <div class="hint-actions">
+                <button id="btn-use-current-scope" type="button">Use Current Folder</button>
+                <button id="btn-use-suggested-alias" type="button">Use Suggested Alias</button>
+            </div>
+            <ul id="runtime-checks" class="status-list"></ul>
+        </div>
+
+        <div id="token-input-group">
+            <label>Telegram Bot Token:</label>
+            <input type="text" id="bot-token" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" required>
+            <p class="help-text">Get it from <a href="https://t.me/BotFather" target="_blank" style="color: var(--herd-brown); font-weight: bold; text-decoration: underline;">@BotFather</a> on Telegram → <code>/newbot</code></p>
+            <button id="btn-verify-token" type="button" style="margin-top: 10px;">Connect Bot</button>
+            <div id="token-error" style="color: red; margin-top: 5px; font-size: 0.9em;"></div>
+        </div>
+
+        <div id="group-pairing-section" class="hidden" style="margin-top: 20px; padding: 15px; border: 2px dashed var(--herd-brown); border-radius: var(--herd-radius); background: rgba(0,0,0,0.02);">
+            <h3 style="margin-top:0; color: var(--herd-brown);">Link your Telegram Group</h3>
+            <p style="margin-bottom: 5px;">1. Add your bot to the Telegram group you want to use.</p>
+            <p style="margin-bottom: 5px;">2. Send this exact message in the group:</p>
+            <div style="background: white; border: 1px solid var(--herd-input-border); padding: 10px; text-align: center; border-radius: 4px; font-size: 20px; font-family: monospace; letter-spacing: 2px; margin-bottom: 10px;">
+                <strong id="pin-display">/init 1234</strong>
+            </div>
+            <p id="pairing-status" style="color: #666; font-size: 0.9em; text-align: center;">⏳ Waiting for message in Telegram... (Timeout in 60s)</p>
+        </div>
+
+        <input type="hidden" id="group-id">
+        <div id="group-status-note" class="hidden" style="margin-top: 15px; padding: 12px 14px; background: #EEF6E6; border: 1px solid #CDE2B7; border-radius: var(--herd-radius); color: #47612C;"></div>
+
+        <div id="agent-config-section" class="hidden">
+            <div style="margin-top: 15px;">
+                <label>Agent Type:</label><br>
+                <div style="margin-top: 8px;">
+                    <strong style="font-size: 0.85em; color: var(--herd-brown);">CLI Agents</strong><br>
+                    <input type="radio" name="agent" value="claude-code" id="agent-claude" checked> <label for="agent-claude">Claude Code</label><br>
+                    <input type="radio" name="agent" value="gemini" id="agent-gemini"> <label for="agent-gemini">Gemini CLI</label><br>
+                    <input type="radio" name="agent" value="codex" id="agent-codex"> <label for="agent-codex">Codex</label>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong style="font-size: 0.85em; color: var(--herd-brown);">VSCode-Based Agents</strong><br>
+                    <input type="radio" name="agent" value="vscode" id="agent-vscode"> <label for="agent-vscode">VSCode / Cursor / Antigravity</label>
+                    <div id="vscode-sub" class="hidden" style="margin-left: 24px; margin-top: 6px;">
+                        <select id="vscode-flavor" style="padding: 8px; border: 1px solid var(--herd-border); border-radius: var(--herd-radius); font-size: 14px; width: 100%;">
+                            <option value="cursor">Cursor</option>
+                            <option value="antigravity">Antigravity</option>
+                            <option value="vscode-generic">Other VSCode Extension</option>
+                        </select>
+                        <p class="help-text">Herd will write tasks to <code>.herd/tasks/pending.json</code>. Your VSCode agent picks them up automatically.</p>
+                    </div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong style="font-size: 0.85em; color: var(--herd-brown);">Other</strong><br>
+                    <input type="radio" name="agent" value="other" id="agent-other"> <label for="agent-other">Custom CLI command</label>
+                    <input type="text" id="agent-custom" placeholder="Custom command (e.g. my-agent --run)" style="display:none; margin-top: 5px;">
+                </div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <label>Agent Name in Group:</label>
+                <input type="text" id="alias" placeholder="agent_back" required>
+                <p class="help-text" id="alias-help">You can type something human-friendly. Herd will clean it up automatically before saving.</p>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <label>Project Folder:</label>
+                <input type="text" id="scope" placeholder="/home/user/my-project" required>
+                <p class="help-text" style="font-size: 0.8em; margin-top: 5px;">
+                    This is the root of the project your agent will work on. You can paste an absolute path, use something relative like <code>.</code>, or click <strong>Use Current Folder</strong> above.<br>
+                    • The <code>.herd/</code> folder will be created here (context, memory, tasks).<br>
+                    • The agent runs its commands from this directory.<br>
+                    • The agent will have access to all files inside this project.
+                </p>
+            </div>
+        </div>
+
+        <div id="storage-options" class="hidden" style="margin-top: 20px; padding: 14px 16px; border: 1px solid var(--herd-input-border); border-radius: var(--herd-radius); background: rgba(0,0,0,0.02);">
+            <label style="display: flex; gap: 10px; align-items: flex-start;">
+                <input type="checkbox" id="sync-env" checked style="margin-top: 3px;">
+                <span>
+                    <strong>Keep CLI settings synced in <code>.env</code></strong><br>
+                    <span class="help-text">Recommended. The UI will update <code>config.json</code> and <code>.env</code> together so terminal commands and dashboard stay aligned.</span>
+                </span>
+            </label>
+            <p id="storage-targets" class="help-text" style="margin-top: 10px;"></p>
+        </div>
+
+        <div id="step-2-actions" class="hidden" style="margin-top: 20px;">
+            <button id="btn-back-1">← Back</button>
+            <button id="btn-step2">Continue →</button>
+        </div>
+    </section>
+
+    <!-- STEP 3: Confirmation -->
+    <section id="step-3" class="step-panel hidden">
+        <h2>Confirmation</h2>
+        <div id="summary"></div>
+        <div id="will-create" style="margin-top: 15px; font-size: 0.9em; color: #666;">
+            This will create a <code>config.json</code> and initialize a <code>.herd/</code> directory in your project's root.
+        </div>
+        <div style="margin-top: 20px;">
+            <button id="btn-back-2">← Back</button>
+            <button id="btn-start">🐄 Start Herd</button>
+        </div>
+    </section>
+
+        <script>
+            let isBootstrap = false;
+            let currentConfigMeta = null;
+            let lastVerifiedToken = null;
+            let hasStoredBotToken = false;
+
+        function normalizeAlias(value) {
+            return (value || '')
+                .trim()
+                .replace(/^@+/, '')
+                .toLowerCase()
+                .replace(/[\s-]+/g, '_')
+                .replace(/[^a-z0-9_]/g, '')
+                .replace(/_+/g, '_')
+                .replace(/^_+|_+$/g, '');
+        }
+
+        function unlockConfiguration() {
+            document.getElementById('agent-config-section').classList.remove('hidden');
+            document.getElementById('storage-options').classList.remove('hidden');
+            document.getElementById('step-2-actions').classList.remove('hidden');
+        }
+
+            function updateStoragePreview() {
+                const syncEnv = document.getElementById('sync-env').checked;
+                const configPath = currentConfigMeta?.config_path || 'config.json';
+                const envPath = currentConfigMeta?.env_path || '.env';
+                const storageTargets = document.getElementById('storage-targets');
+                const willCreate = document.getElementById('will-create');
+
+                if (syncEnv) {
+                    storageTargets.innerHTML = `The UI will keep non-secret settings in <code>${configPath}</code> and <code>${envPath}</code> in sync. The bot token stays only in <code>${envPath}</code>.`;
+                    willCreate.innerHTML = 'This will update <code>config.json</code>, keep the bot token in <code>.env</code>, sync the remaining CLI settings, and initialize a <code>.herd/</code> directory in your project root.';
+                } else {
+                    storageTargets.innerHTML = `The UI will update <code>${configPath}</code>. The bot token still stays only in <code>${envPath}</code>.`;
+                    willCreate.innerHTML = 'This will update <code>config.json</code>, keep the bot token in <code>.env</code>, and initialize a <code>.herd/</code> directory in your project root.';
+                }
+            }
+
+        function applyAgentPrefill(agentConfig = {}) {
+            const type = agentConfig.type;
+            if (!type) return;
+
+            const cliMap = {
+                'claude-code': 'agent-claude',
+                'gemini': 'agent-gemini',
+                'codex': 'agent-codex',
+            };
+
+            if (cliMap[type]) {
+                document.getElementById(cliMap[type]).checked = true;
+                document.getElementById('agent-custom').style.display = 'none';
+                document.getElementById('vscode-sub').style.display = 'none';
+                return;
+            }
+
+            if (['cursor', 'antigravity', 'vscode-generic'].includes(type)) {
+                document.getElementById('agent-vscode').checked = true;
+                document.getElementById('vscode-sub').style.display = 'block';
+                document.getElementById('agent-custom').style.display = 'none';
+                document.getElementById('vscode-flavor').value = type;
+                return;
+            }
+
+            document.getElementById('agent-other').checked = true;
+            document.getElementById('agent-custom').style.display = 'block';
+            document.getElementById('vscode-sub').style.display = 'none';
+            document.getElementById('agent-custom').value = [agentConfig.command || '', ...(agentConfig.args || [])]
+                .filter(Boolean)
+                .join(' ');
+        }
+
+            function updateAliasHelp() {
+                const aliasInput = document.getElementById('alias');
+                const aliasHelp = document.getElementById('alias-help');
+                const raw = aliasInput.value.trim();
+                const normalized = normalizeAlias(raw);
+
+                if (!raw) {
+                    aliasHelp.textContent = 'You can type something human-friendly. Herd will clean it up automatically before saving.';
+                    return;
+                }
+
+                if (normalized.length < 3) {
+                    aliasHelp.textContent = 'Use at least 3 letters or numbers so Herd can generate a stable @alias.';
+                    return;
+                }
+
+                if (normalized !== raw.replace(/^@+/, '')) {
+                    aliasHelp.innerHTML = `Herd will save this as <code>@${normalized}</code>.`;
+                    return;
+                }
+
+                aliasHelp.innerHTML = `This will appear in Telegram as <code>@${normalized}</code>.`;
+            }
+
+            function renderMachineHints(diagnostics = {}) {
+                const card = document.getElementById('machine-hints');
+                const summary = document.getElementById('machine-summary');
+                const detectedAgents = document.getElementById('detected-agents');
+                const checks = document.getElementById('runtime-checks');
+
+                if (!diagnostics || !diagnostics.defaults) {
+                    card.classList.add('hidden');
+                    return;
+                }
+
+                summary.innerHTML = `Current folder: <code>${diagnostics.defaults.scope}</code><br>Suggested alias: <code>@${diagnostics.defaults.alias}</code>`;
+
+                if (diagnostics.detected_agent_labels && diagnostics.detected_agent_labels.length) {
+                    detectedAgents.innerHTML = `Detected CLI agent(s): <strong>${diagnostics.detected_agent_labels.join(', ')}</strong>. Herd preselects the first one it found.`;
+                } else {
+                    detectedAgents.innerHTML = 'No supported CLI agent was auto-detected. You can still use VSCode watcher mode or a custom CLI command.';
+                }
+
+                const packageOk = diagnostics.required_packages_ready;
+                const packageText = packageOk
+                    ? 'Herd runtime dependencies are ready on this machine.'
+                    : `Missing Python packages: ${diagnostics.missing_required_packages.join(', ')}`;
+                const recommendedAgent = diagnostics.agents?.find(agent => agent.type === diagnostics.recommended_agent);
+                const recommendedAgentText = diagnostics.detected_agent_labels?.length
+                    ? `Recommended agent for this machine: ${recommendedAgent?.label || diagnostics.recommended_agent}.`
+                    : 'Pick the agent you want Herd to talk to.';
+
+                checks.innerHTML = `
+                    <li class="status-item ok">Python ${diagnostics.python?.version || 'ready'} is available for Herd.</li>
+                    <li class="status-item ${packageOk ? 'ok' : 'warn'}">${packageText}</li>
+                    <li class="status-item ok">${recommendedAgentText}</li>
+                `;
+
+                card.classList.remove('hidden');
+            }
+
+            function applyCurrentConfig(data) {
+                currentConfigMeta = data;
+                hasStoredBotToken = Boolean(data.has_bot_token);
+
+                if (data.sources && data.sources.length) {
+                    const sourceLabel = data.sources.join(' + ');
+                    const banner = document.getElementById('config-banner');
+                    banner.innerHTML = `Loaded existing settings from <strong>${sourceLabel}</strong>. You can adjust them here and keep CLI + UI aligned.`;
+                banner.classList.remove('hidden');
+            }
+
+                const config = data.config || {};
+                const diagnostics = data.diagnostics || {};
+                renderMachineHints(diagnostics);
+
+                if (hasStoredBotToken) {
+                    document.getElementById('bot-token').placeholder = 'Stored securely in .env';
+                }
+                if (config.telegram_group_id) document.getElementById('group-id').value = config.telegram_group_id;
+                if (config.alias) {
+                    document.getElementById('alias').value = config.alias;
+                } else if (diagnostics.defaults?.alias) {
+                    document.getElementById('alias').value = diagnostics.defaults.alias;
+                }
+                if (config.scope) {
+                    document.getElementById('scope').value = config.scope;
+                } else if (diagnostics.defaults?.scope) {
+                    document.getElementById('scope').value = diagnostics.defaults.scope;
+                }
+
+                if (config.agent && config.agent.type) {
+                    applyAgentPrefill(config.agent || {});
+                } else if (diagnostics.recommended_agent) {
+                    applyAgentPrefill({ type: diagnostics.recommended_agent });
+                }
+
+                if (hasStoredBotToken && config.telegram_group_id) {
+                    const note = document.getElementById('group-status-note');
+                    note.innerHTML = `✅ Telegram group already linked (ID: ${config.telegram_group_id}). The bot token stays stored locally in <code>.env</code>. Reconnect only if you want to change it.`;
+                    note.classList.remove('hidden');
+                    unlockConfiguration();
+                    document.getElementById('btn-verify-token').disabled = false;
+                    document.getElementById('btn-verify-token').textContent = 'Reconnect Bot';
+                }
+
+            updateAliasHelp();
+            updateStoragePreview();
+        }
+
+        // --- AUTO-DETECT FIRST RUN ---
+        (async function checkFirstRun() {
+            try {
+                const res = await fetch('/api/check-first-run');
+                const data = await res.json();
+                isBootstrap = data.first_run;
+            } catch (e) {
+                isBootstrap = true; // If API fails, assume first run
+            }
+
+            document.getElementById('loading-check').classList.add('hidden');
+
+            if (isBootstrap) {
+                document.getElementById('bootstrap-section').classList.remove('hidden');
+            } else {
+                document.getElementById('token-section').classList.remove('hidden');
+            }
+        })();
+
+        (async function loadCurrentConfig() {
+            try {
+                const res = await fetch('/api/current-config');
+                const data = await res.json();
+                applyCurrentConfig(data);
+            } catch (e) {
+                updateStoragePreview();
+            }
+        })();
+
+        // --- AGENT RADIO TOGGLE ---
+        const botTokenInput = document.getElementById('bot-token');
+        const aliasInput = document.getElementById('alias');
+        document.querySelectorAll('input[name="agent"]').forEach(el => {
+            el.addEventListener('change', e => {
+                document.getElementById('agent-custom').style.display = e.target.value === 'other' ? 'block' : 'none';
+                document.getElementById('vscode-sub').style.display = e.target.value === 'vscode' ? 'block' : 'none';
+            });
+        });
+        document.getElementById('sync-env').addEventListener('change', updateStoragePreview);
+        aliasInput.addEventListener('input', updateAliasHelp);
+        document.getElementById('btn-use-current-scope').addEventListener('click', () => {
+            const suggestedScope = currentConfigMeta?.diagnostics?.defaults?.scope;
+            if (!suggestedScope) return;
+            document.getElementById('scope').value = suggestedScope;
+        });
+        document.getElementById('btn-use-suggested-alias').addEventListener('click', () => {
+            const suggestedAlias = currentConfigMeta?.diagnostics?.defaults?.alias;
+            if (!suggestedAlias) return;
+            aliasInput.value = suggestedAlias;
+            updateAliasHelp();
+        });
+        botTokenInput.addEventListener('input', () => {
+            const typedToken = botTokenInput.value.trim();
+            if (!typedToken) {
+                if (lastVerifiedToken) {
+                    lastVerifiedToken = null;
+                }
+                return;
+            }
+
+            if (lastVerifiedToken && typedToken === lastVerifiedToken) return;
+
+            lastVerifiedToken = null;
+            document.getElementById('group-id').value = '';
+            document.getElementById('group-status-note').classList.add('hidden');
+            document.getElementById('btn-verify-token').textContent = 'Connect Bot';
+        });
+
+        // --- TOKEN VALIDATION (non-bootstrap flow) ---
+        const tokenInput = document.getElementById('token-input');
+        const tokenFeedback = document.getElementById('token-feedback');
+        const btnStep1 = document.getElementById('btn-step1');
+
+        let debounceTimer;
+        tokenInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            const val = this.value.trim();
+            btnStep1.disabled = true;
+            if (val.length < 6) {
+                tokenFeedback.classList.add('hidden');
+                return;
+            }
+            debounceTimer = setTimeout(() => validateToken(val), 600);
+        });
+
+        async function validateToken(token) {
+            try {
+                const res = await fetch('/api/validate-token', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({token})
+                });
+                const data = await res.json();
+
+                if (data.valid) {
+                    tokenFeedback.className = 'feedback success';
+                    tokenFeedback.innerHTML = `✓ Valid Token<br>Role: ${data.role}<br>Scope: ${data.scope}`;
+                    btnStep1.disabled = false;
+                    window.tokenData = {...data, token};
+                    if (data.suggested_alias) {
+                        document.getElementById('alias').value = data.suggested_alias;
+                        updateAliasHelp();
+                    }
+                    if (data.scope && data.scope !== '/') document.getElementById('scope').value = data.scope;
+                } else {
+                    tokenFeedback.className = 'feedback error';
+                    tokenFeedback.textContent = data.error || 'Invalid token.';
+                    btnStep1.disabled = true;
+                }
+                tokenFeedback.classList.remove('hidden');
+            } catch (err) {
+                tokenFeedback.className = 'feedback error';
+                tokenFeedback.textContent = 'Error connecting to server.';
+                tokenFeedback.classList.remove('hidden');
+            }
+        }
+
+        // --- NAVIGATION ---
+        const goToStep = (step) => {
+            document.querySelectorAll('.step-panel').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.getElementById(`step-${step}`).classList.remove('hidden');
+            document.querySelector(`.step[data-step="${step}"]`).classList.add('active');
+        };
+
+        btnStep1.addEventListener('click', () => goToStep(2));
+        document.getElementById('btn-bootstrap-next').addEventListener('click', () => {
+            window.tokenData = { role: 'OWNER', scope: '/' };
+            goToStep(2);
+        });
+        document.getElementById('btn-back-1').addEventListener('click', () => goToStep(1));
+        document.getElementById('btn-back-2').addEventListener('click', () => goToStep(2));
+
+        // --- STEP 2 PIN VERIFICATION ---
+        document.getElementById('btn-verify-token').addEventListener('click', () => {
+             const token = document.getElementById('bot-token').value.trim();
+             if (!token) {
+                 document.getElementById('token-error').textContent = "Please enter a valid token.";
+                 return;
+             }
+             document.getElementById('token-error').textContent = "";
+             document.getElementById('group-status-note').classList.add('hidden');
+             document.getElementById('btn-verify-token').disabled = true;
+             document.getElementById('btn-verify-token').textContent = "Connecting...";
+
+             const pin = Math.floor(1000 + Math.random() * 9000);
+             document.getElementById('pin-display').textContent = `/init ${pin}`;
+             document.getElementById('group-pairing-section').classList.remove('hidden');
+
+             const statusEl = document.getElementById('pairing-status');
+             statusEl.textContent = "⏳ Waiting for message in Telegram... (Timeout in 60s)";
+             statusEl.style.color = "#666";
+
+             fetch(`/api/await-group-pin?token=${encodeURIComponent(token)}&pin=${pin}`)
+                 .then(res => res.json())
+                 .then(data => {
+                     if (data.success) {
+                         statusEl.textContent = "✅ Group paired successfully!";
+                         statusEl.style.color = "green";
+                         document.getElementById('group-id').value = data.group_id;
+                         lastVerifiedToken = token;
+                         document.getElementById('btn-verify-token').disabled = false;
+                         document.getElementById('btn-verify-token').textContent = "Reconnect Bot";
+                         unlockConfiguration();
+                     } else {
+                         statusEl.textContent = "❌ " + data.error;
+                         statusEl.style.color = "red";
+                         document.getElementById('btn-verify-token').disabled = false;
+                         document.getElementById('btn-verify-token').textContent = "Try Again";
+                     }
+                 })
+                 .catch(err => {
+                     statusEl.textContent = "❌ Network error. Try again.";
+                     document.getElementById('btn-verify-token').disabled = false;
+                     document.getElementById('btn-verify-token').textContent = "Try Again";
+                 });
+        });
+
+        // --- STEP 2 → 3 ---
+        document.getElementById('btn-step2').addEventListener('click', () => {
+            const botToken = document.getElementById('bot-token').value.trim();
+            const useStoredToken = !botToken && hasStoredBotToken;
+            const groupId = parseInt(document.getElementById('group-id').value);
+            let agent = document.querySelector('input[name="agent"]:checked').value;
+            const alias = normalizeAlias(document.getElementById('alias').value);
+            const scope = document.getElementById('scope').value.trim();
+            const syncEnv = document.getElementById('sync-env').checked;
+
+            let command = null;
+            let vscodeFlavor = null;
+            if (agent === 'other') {
+                command = document.getElementById('agent-custom').value.trim();
+            } else if (agent === 'vscode') {
+                vscodeFlavor = document.getElementById('vscode-flavor').value;
+                agent = vscodeFlavor; // Send the specific flavor as agent type
+            }
+
+            if ((!botToken && !useStoredToken) || isNaN(groupId) || !alias || !scope) {
+                alert("Please fill all required fields correctly.");
+                return;
+            }
+            if (alias.length < 3) {
+                alert("Choose a name with at least 3 letters or numbers. Herd will clean it up automatically.");
+                return;
+            }
+
+            window.setupData = {
+                bootstrap: isBootstrap,
+                token: isBootstrap ? null : window.tokenData.token,
+                telegram_bot_token: botToken,
+                use_stored_token: useStoredToken,
+                telegram_group_id: groupId,
+                agent: agent,
+                command: command,
+                alias: alias,
+                scope: scope,
+                sync_env: syncEnv
+            };
+
+            const role = isBootstrap ? 'OWNER' : window.tokenData.role;
+            const settingsTarget = syncEnv ? 'config.json + .env' : 'config.json + secure token in .env';
+
+            document.getElementById('summary').innerHTML = `
+                <p><strong>Role:</strong> ${role}</p>
+                <p><strong>Alias:</strong> @${alias}</p>
+                <p><strong>Agent:</strong> ${agent}</p>
+                <p><strong>Directory:</strong> ${scope}</p>
+                <p><strong>Settings:</strong> ${settingsTarget}</p>
+            `;
+
+            updateStoragePreview();
+            goToStep(3);
+        });
+
+        // --- FINAL SUBMIT ---
+        document.getElementById('btn-start').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-start');
+            btn.disabled = true;
+            btn.textContent = 'Setting up...';
+
+            try {
+                const res = await fetch('/api/setup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(window.setupData)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    window.location.href = '/dashboard';
+                } else {
+                    alert('Setup failed: ' + data.error);
+                    btn.disabled = false;
+                    btn.textContent = '🐄 Start Herd';
+                }
+            } catch (err) {
+                alert('Network error during setup.');
+                btn.disabled = false;
+                btn.textContent = '🐄 Start Herd';
+            }
+        });
+    </script>
+</body>
+</html>

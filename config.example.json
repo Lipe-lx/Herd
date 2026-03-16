@@ -1,0 +1,21 @@
+{
+  "telegram_bot_token": null,
+  "telegram_group_id": -100123456789,
+  "telegram_id": 123456789,
+  "invite_token": "herd-bootstrap",
+  "alias": "agent_back",
+  "agent": {
+    "type": "claude-code",
+    "command": "claude",
+    "args": ["--print"]
+  },
+  "scope": "/absolute/path/to/project",
+  "allowed_scope": "/absolute/path/to/project",
+  "cargo": "DEV",
+  "auto_register": true,
+  "proactive_events": {
+    "on_commit": false,
+    "on_build_fail": false,
+    "on_pr_open": false
+  }
+}

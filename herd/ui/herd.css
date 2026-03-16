@@ -1,0 +1,92 @@
+:root {
+  --herd-brown: #8B5E3C;
+  --herd-cream: #F5F0E8;
+  --herd-green: #2D6A4F;
+  --herd-border: #D4C9B0;
+  --herd-radius: 8px;
+  --herd-font: system-ui, -apple-system, sans-serif;
+}
+
+body {
+  font-family: var(--herd-font);
+  background: var(--herd-cream);
+  color: #2C2C2A;
+  max-width: 560px;
+  margin: 40px auto;
+  padding: 0 20px;
+  line-height: 1.5;
+}
+
+.logo {
+  display: block;
+  max-width: 150px;
+  margin: 0 auto 20px auto;
+}
+
+h1, h2, h3 {
+  color: var(--herd-brown);
+}
+
+.feedback {
+  margin-top: 10px;
+  margin-bottom: 10px;
+  font-size: 0.9em;
+}
+
+.feedback.success { 
+  color: var(--herd-green); 
+  background: #EAF3DE; 
+  padding: 10px; 
+  border-radius: var(--herd-radius); 
+  border: 1px solid #CEE8B4;
+}
+
+.feedback.error { 
+  color: #A32D2D; 
+  background: #FCEBEB; 
+  padding: 10px; 
+  border-radius: var(--herd-radius); 
+  border: 1px solid #F6D0D0;
+}
+
+button {
+  background: var(--herd-brown);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--herd-radius);
+  cursor: pointer;
+  font-size: 15px;
+  transition: background 0.2s;
+}
+
+button:disabled { 
+  opacity: 0.5; 
+  cursor: not-allowed; 
+}
+
+button:hover:not(:disabled) { 
+  background: #6B4A2E; 
+}
+
+input[type="text"], input[type="number"] {
+  width: 100%;
+  padding: 10px;
+  margin-top: 5px;
+  border: 1px solid var(--herd-border);
+  border-radius: var(--herd-radius);
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+input[type="text"]:focus, input[type="number"]:focus {
+  outline: none;
+  border-color: var(--herd-brown);
+  box-shadow: 0 0 0 2px rgba(139, 94, 60, 0.2);
+}
+
+label {
+  font-weight: 500;
+  font-size: 0.9em;
+  color: #555;
+}
