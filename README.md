@@ -24,6 +24,30 @@ Instead of relying on a centralized super-agent, Herd enables a decentralized sw
 
 Clone the project to the environment from which you want your agent to operate.
 
+## ⚡ New User Onboarding
+
+For most users, the setup is:
+
+```bash
+git clone https://github.com/Lipe-lx/Herd.git
+cd Herd
+./start.sh
+```
+
+That is the recommended path. On a fresh machine, `./start.sh` will:
+- create `.env` from `.env.example`
+- create `.venv/`
+- install the Python dependencies
+- open the local setup wizard in the browser
+- save the non-secret runtime settings for you
+
+What the user still needs to provide in the wizard:
+- a Telegram Bot Token
+- an invite token if they are joining an existing Herd as a non-owner
+- the local project folder and agent choice
+
+Most users do not need to manually create `config.json`. The setup UI writes it for them.
+
 For the smoothest post-clone experience, use the guided launcher:
 
 ```bash
@@ -71,7 +95,9 @@ If `/init` and `/members` work but normal messages such as `hello @agent_owner` 
 4. Select `Disable`.
 
 ### 2. Configure Your Agent
-If you use the guided launcher or the setup UI, Herd writes `config.json` for you.
+If you use `./start.sh`, Herd opens the setup UI and writes `config.json` for you.
+That is the default onboarding flow and the easiest option for new users.
+
 If you prefer to configure things manually, copy the example configuration file in the project you want to collaborate on:
 
 ```bash
@@ -119,6 +145,12 @@ For most users, this is now the only command you need:
 ```
 
 If Herd is not configured yet, it opens the setup wizard. If it is already configured, it prepares the local runtime, starts the unified poller, and opens the authenticated dashboard.
+
+In practice, the normal user flow is:
+1. Clone the repo.
+2. Run `./start.sh`.
+3. Finish the browser wizard.
+4. Run `./start.sh` again whenever they want to start Herd.
 
 If you are hosting the core instance, you also need to run the Gatekeeper and CRON Manager:
 
