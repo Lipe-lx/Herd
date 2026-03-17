@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Herd Context</title>
+    <link rel="stylesheet" href="/herd.css">
+</head>
+<body class="dashboard-page dashboard-context-page">
+    <div class="app-shell stack dashboard-shell dashboard-detail-shell">
+        <section class="hero-card dashboard-hero dashboard-detail-hero-shell">
+            <div class="dashboard-detail-topbar">
+                <a class="dashboard-back-link" href="/dashboard">Back to dashboard</a>
+                <div class="dashboard-context-nav">
+                    <a class="dashboard-context-link" data-view-link="messages" href="/dashboard/messages">Messages</a>
+                    <a class="dashboard-context-link" data-view-link="tasks" href="/dashboard/tasks">Tasks</a>
+                    <a class="dashboard-context-link" data-view-link="members" href="/dashboard/members">Members</a>
+                </div>
+            </div>
+
+            <div class="dashboard-hero-grid dashboard-detail-hero-grid">
+                <div class="dashboard-intro">
+                    <div class="dashboard-brand-row">
+                        <img src="/logo.png" alt="Herd Logo" class="logo dashboard-logo">
+                        <div class="dashboard-brand-copy">
+                            <span class="eyebrow" id="detail-kicker">Context</span>
+                            <h1 id="detail-title">Loading...</h1>
+                        </div>
+                    </div>
+                    <p class="hero-copy" id="detail-copy">Loading page details...</p>
+                </div>
+
+                <div class="panel dashboard-summary-panel">
+                    <div class="dashboard-summary-lead">
+                        <div class="dashboard-status-block">
+                            <span class="metric-label">Status</span>
+                            <span class="metric-value" id="hero-status">Loading...</span>
+                        </div>
+                        <div class="dashboard-status-block">
+                            <span class="metric-label">Agent</span>
+                            <span class="metric-value" id="hero-alias">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="summary-grid dashboard-summary-secondary">
+                        <div class="metric">
+                            <span class="metric-label">Workspace</span>
+                            <span class="metric-value" id="hero-scope">Loading...</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Access mode</span>
+                            <span class="metric-value" id="hero-access">Loading...</span>
+                        </div>
+                    </div>
+                    <p class="dashboard-summary-note">Auto-refresh every 5 seconds.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel dashboard-panel dashboard-detail-panel">
+            <div class="section-head dashboard-section-head">
+                <div>
+                    <span class="section-kicker" id="detail-section-kicker">Context</span>
+                    <h2 id="detail-section-title">Loading...</h2>
+                </div>
+                <p class="section-copy" id="detail-section-copy">Loading page details...</p>
+            </div>
+            <div id="detail-content" class="dashboard-detail-content">
+                <p class="helper">Loading...</p>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+        const pageConfig = {
+            messages: {
+                kicker: 'Messages',
+                title: 'Recent messages',
+                copy: 'Review the latest messages recorded for this instance today.',
+                sectionTitle: 'Message history',
+                sectionCopy: 'Chronological conversation updates for the current instance.',
+                fetcher: async () => (await fetch('/api/messages').then(res => res.json())).messages || [],
+                render: renderMessages
+            },
+            tasks: {
+                kicker: 'Tasks',
+                title: 'Scheduled tasks',
+                copy: 'Inspect the active cron work currently targeting agents in this Telegram group.',
+                sectionTitle: 'Active cron schedule',
+                sectionCopy: 'Only active background tasks are shown here.',
+                fetcher: async () => ((await fetch('/api/cron').then(res => res.json())).tasks || []).filter(task => task.active),
+                render: renderCron
+            },
+            members: {
+                kicker: 'Members',
+                title: 'Registered agents',
+                copy: 'See which agents are currently registered in this Herd group.',
+                sectionTitle: 'Member registry',
+                sectionCopy: 'Aliases and cargos registered for the current group.',
+                fetcher: async () => (await fetch('/api/members').then(res => res.json())).members || [],
+                render: renderMembers
+            }
+        }
+
+        function resolveView() {
+            const parts = window.location.pathname.split('/').filter(Boolean)
+            const view = parts[parts.length - 1]
+            return pageConfig[view] ? view : 'messages'
+        }
+
+        function escapeHtml(unsafe) {
+            return (unsafe || '').toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;')
+        }
+
+        function formatTime(isoStr) {
+            const d = new Date(isoStr)
+            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
+        }
+
+        function accessModeLabel(data) {
+            return data?.access_mode === 'report-only' ? 'Report-only' : 'Write enabled'
+        }
+
+        function animateElement(element, className = 'panel-enter') {
+            if (!element || prefersReducedMotion) return
+            element.classList.remove(className)
+            void element.offsetWidth
+            element.classList.add(className)
+            window.setTimeout(() => element.classList.remove(className), 500)
+        }
+
+        function setTextWithRefresh(id, nextValue) {
+            const element = document.getElementById(id)
+            if (!element) return
+            const value = `${nextValue || ''}`
+            if (element.textContent !== value) {
+                element.textContent = value
+                animateElement(element, 'is-refreshed')
+            }
+        }
+
+        function setHtmlWithRefresh(id, nextValue) {
+            const element = document.getElementById(id)
+            if (!element) return
+            if (element.innerHTML !== nextValue) {
+                element.innerHTML = nextValue
+                animateElement(element, 'is-refreshed')
+            }
+        }
+
+        function setMetricState(id, state) {
+            const element = document.getElementById(id)
+            if (!element) return
+
+            if (state) {
+                element.dataset.state = state
+            } else {
+                delete element.dataset.state
+            }
+        }
+
+        function renderStatus(data) {
+            const aliasStr = data.alias ? `@${data.alias}` : 'Not configured'
+            const isOnline = data.online ? 'Online' : 'Offline'
+            const accessMode = accessModeLabel(data)
+
+            setTextWithRefresh('hero-status', isOnline)
+            setTextWithRefresh('hero-alias', aliasStr)
+            setTextWithRefresh('hero-scope', data.scope || 'Not configured')
+            setTextWithRefresh('hero-access', accessMode)
+            setMetricState('hero-status', data.online ? 'online' : 'offline')
+            setMetricState('hero-access', data?.access_mode === 'report-only' ? 'report-only' : 'write-enabled')
+        }
+
+        function configurePage(view) {
+            const config = pageConfig[view]
+            if (!config) return
+
+            document.title = `Herd ${config.title}`
+            document.getElementById('detail-kicker').textContent = config.kicker
+            document.getElementById('detail-title').textContent = config.title
+            document.getElementById('detail-copy').textContent = config.copy
+            document.getElementById('detail-section-kicker').textContent = config.kicker
+            document.getElementById('detail-section-title').textContent = config.sectionTitle
+            document.getElementById('detail-section-copy').textContent = config.sectionCopy
+
+            document.querySelectorAll('[data-view-link]').forEach(link => {
+                link.classList.toggle('is-active', link.dataset.viewLink === view)
+            })
+        }
+
+        function renderMessages(data) {
+            const content = document.getElementById('detail-content')
+            if (!data || data.length === 0) {
+                content.innerHTML = '<p class="helper">No messages recorded today.</p>'
+                return
+            }
+
+            content.innerHTML = `
+                <div class="message-list">
+                    ${data.map(message => `
+                        <article class="message-card">
+                            <div class="message-head">
+                                <span class="sender">${escapeHtml(message.from)}</span>
+                                <span class="ts">${escapeHtml(formatTime(message.ts))}</span>
+                            </div>
+                            <p class="message-body">${escapeHtml(message.text)}</p>
+                        </article>
+                    `).join('')}
+                </div>
+            `
+        }
+
+        function renderCron(tasks) {
+            const content = document.getElementById('detail-content')
+            if (!tasks || tasks.length === 0) {
+                content.innerHTML = '<p class="helper">No active scheduled tasks.</p>'
+                return
+            }
+
+            content.innerHTML = `
+                <div class="stack dashboard-detail-stack">
+                    ${tasks.map(task => `
+                        <article class="metric">
+                            <span class="metric-label">@${escapeHtml(task.alias)} | ${escapeHtml(task.cron)}</span>
+                            <span class="metric-value">${escapeHtml(task.task)}</span>
+                        </article>
+                    `).join('')}
+                </div>
+            `
+        }
+
+        function renderMembers(members) {
+            const content = document.getElementById('detail-content')
+            if (!members || members.length === 0) {
+                content.innerHTML = '<p class="helper">No members found.</p>'
+                return
+            }
+
+            content.innerHTML = `
+                <div class="summary-grid dashboard-summary-grid dashboard-member-grid">
+                    ${members.map(member => `
+                        <article class="metric">
+                            <span class="metric-label">${escapeHtml(member.cargo)}</span>
+                            <span class="metric-value">@${escapeHtml(member.alias)}</span>
+                        </article>
+                    `).join('')}
+                </div>
+            `
+        }
+
+        async function refreshPage() {
+            const view = resolveView()
+            const config = pageConfig[view]
+
+            try {
+                const [statusRes, detailData] = await Promise.all([
+                    fetch('/api/status').catch(() => null),
+                    config.fetcher().catch(() => null)
+                ])
+
+                if (statusRes && statusRes.ok) {
+                    renderStatus(await statusRes.json())
+                }
+
+                config.render(detailData || [])
+            } catch (err) {
+                console.error('Failed to refresh detail page:', err)
+                setHtmlWithRefresh('detail-content', '<p class="helper">Unable to load this page right now.</p>')
+            }
+        }
+
+        const initialView = resolveView()
+        configurePage(initialView)
+        refreshPage()
+        setInterval(refreshPage, 5000)
+    </script>
+</body>
+</html>

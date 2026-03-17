@@ -6,209 +6,178 @@
     <title>Herd Dashboard</title>
     <link rel="stylesheet" href="/herd.css">
 </head>
-<body>
-    <div class="app-shell stack">
-        <section class="hero-card">
-            <div class="hero-grid">
-                <div>
-                    <img src="/logo.png" alt="Herd Logo" class="logo">
-                    <span class="eyebrow">Instance Dashboard</span>
-                    <h1>Manage this Herd agent without guessing what will change</h1>
-                    <p class="hero-copy">
-                        Reconfigure the current instance, switch it to report-only mode, or open the guided path for a second agent.
-                        The dashboard keeps the "replace this instance" and "add another active agent" paths clearly separated.
-                    </p>
-                </div>
-                <div class="panel" style="padding: 20px;">
-                    <div class="section-head" style="margin-bottom: 12px;">
-                        <h3>Current Instance</h3>
-                        <p class="section-copy">This summary updates live from the running process.</p>
+<body class="dashboard-page">
+    <div class="app-shell stack dashboard-shell">
+        <section class="hero-card dashboard-hero">
+            <div class="dashboard-hero-grid">
+                <div class="dashboard-intro">
+                    <div class="dashboard-brand-row">
+                        <img src="/logo.png" alt="Herd Logo" class="logo dashboard-logo">
+                        <div class="dashboard-brand-copy">
+                            <span class="eyebrow">Instance Dashboard</span>
+                            <h1>Current instance</h1>
+                        </div>
                     </div>
-                    <div class="summary-grid">
-                        <div class="metric">
+                    <p class="hero-copy">Status, workspace, and access mode. Nothing else competes here.</p>
+                </div>
+                <div class="panel dashboard-summary-panel">
+                    <div class="dashboard-summary-lead">
+                        <div class="dashboard-status-block">
+                            <span class="metric-label">Status</span>
+                            <span class="metric-value" id="hero-status">Loading...</span>
+                        </div>
+                        <div class="dashboard-status-block">
                             <span class="metric-label">Agent</span>
                             <span class="metric-value" id="hero-alias">Loading...</span>
                         </div>
+                    </div>
+                    <div class="summary-grid dashboard-summary-secondary">
                         <div class="metric">
                             <span class="metric-label">Workspace</span>
                             <span class="metric-value" id="hero-scope">Loading...</span>
                         </div>
                         <div class="metric">
-                            <span class="metric-label">Access Mode</span>
+                            <span class="metric-label">Access mode</span>
                             <span class="metric-value" id="hero-access">Loading...</span>
                         </div>
                     </div>
+                    <p class="dashboard-summary-note">Auto-refresh every 5 seconds.</p>
                 </div>
             </div>
-            <div class="progress-row" style="margin-top: 18px;">
-                <div class="progress-step active">
-                    <span class="progress-dot">1</span>
-                    <div class="progress-copy">
-                        <strong>Current Instance</strong>
-                        <span>See what is active right now</span>
-                    </div>
-                </div>
-                <div class="progress-step active">
-                    <span class="progress-dot">2</span>
-                    <div class="progress-copy">
-                        <strong>Safe Changes</strong>
-                        <span>Workspace and access controls</span>
-                    </div>
-                </div>
-                <div class="progress-step active">
-                    <span class="progress-dot">3</span>
-                    <div class="progress-copy">
-                        <strong>Agent Flows</strong>
-                        <span>Reconfigure or add another one</span>
-                    </div>
-                </div>
+            <div class="dashboard-top-links">
+                <a class="dashboard-top-link" href="/dashboard/messages">
+                    <span class="dashboard-top-link-label">Messages</span>
+                    <span class="dashboard-top-link-copy">Read conversation history</span>
+                </a>
+                <a class="dashboard-top-link" href="/dashboard/tasks">
+                    <span class="dashboard-top-link-label">Tasks</span>
+                    <span class="dashboard-top-link-copy">View active cron work</span>
+                </a>
+                <a class="dashboard-top-link" href="/dashboard/members">
+                    <span class="dashboard-top-link-label">Members</span>
+                    <span class="dashboard-top-link-copy">Inspect registered agents</span>
+                </a>
             </div>
         </section>
 
-        <section class="panel">
-            <div class="section-head">
-                <h2>Choose What You Want To Do</h2>
-                <p class="section-copy">
-                    These actions now have different paths on purpose. Reconfiguring this instance edits the current agent.
-                    Adding another active agent opens a guided flow that explains the separate config and process you need.
-                </p>
-            </div>
-            <div class="card-grid">
-                <div class="info-card" style="padding: 18px;">
-                    <div class="pill-row" style="margin-bottom: 10px;">
-                        <span class="tag recommended">Recommended</span>
-                    </div>
-                    <h3>Reconfigure This Instance</h3>
-                    <p class="helper" style="margin-top: 8px;">
-                        Keep the current `config.json` path and edit bot, alias, workspace, or permissions for this same running agent.
-                    </p>
-                    <div class="inline-actions">
-                        <a href="/setup?flow=reconfigure"><button type="button">Open Reconfigure Flow</button></a>
-                    </div>
-                </div>
-                <div class="info-card" style="padding: 18px;">
-                    <div class="pill-row" style="margin-bottom: 10px;">
-                        <span class="tag warning">Separate Instance</span>
-                    </div>
-                    <h3>Add Another Active Agent</h3>
-                    <p class="helper" style="margin-top: 8px;">
-                        Use this when you want a second alias online at the same time. Herd will guide you toward a separate config and, in practice, a separate bot token.
-                    </p>
-                    <div class="inline-actions">
-                        <a href="/setup?flow=add-agent"><button type="button" class="btn-secondary">Open Add-Agent Guide</button></a>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="panel">
-            <div class="section-head">
-                <h2>System Status</h2>
-                <p class="section-copy">Health, identity, and runtime mode for this specific Herd instance.</p>
-            </div>
-            <div id="status-content" class="summary-grid">
-                <div class="metric"><span class="metric-label">Loading</span><span class="metric-value">...</span></div>
-            </div>
-        </section>
-
-        <section class="panel">
-            <div class="section-head">
-                <h2>Workspace</h2>
-                <p class="section-copy">
-                    Changing the workspace only affects this instance. The previous project remains untouched; Herd simply points the live agent to a new folder.
-                </p>
-            </div>
-            <div class="split-grid">
-                <div class="stack">
+        <div class="dashboard-management-grid">
+            <section class="panel dashboard-panel" id="dashboard-controls">
+                <div class="section-head dashboard-section-head">
                     <div>
-                        <div class="helper" style="margin-bottom: 8px;">Current working directory</div>
-                        <div id="scope-current" class="workspace-path">Loading...</div>
+                        <span class="section-kicker">Quick controls</span>
+                        <h2>Workspace and access</h2>
                     </div>
-                    <div class="helper" id="scope-meta">Loading configuration paths...</div>
+                    <p class="section-copy">Focused controls for this running instance only. Nothing here creates or replaces another agent.</p>
                 </div>
-                <div class="stack">
-                    <div class="field-stack">
-                        <label for="scope-input">Change project folder</label>
-                        <input id="scope-input" type="text" placeholder="/home/user/my-project" autocomplete="off">
-                        <p class="help-text">Use an absolute path, a relative path, or `~/project`. Herd will create or refresh `.herd/` there.</p>
+                <div class="control-grid dashboard-control-grid">
+                    <div class="info-card dashboard-control-card">
+                        <div class="section-head dashboard-section-head-tight">
+                            <div>
+                                <span class="section-kicker">Workspace</span>
+                                <h3>Project folder</h3>
+                            </div>
+                            <p class="section-copy">Point this instance somewhere else without leaving the dashboard.</p>
+                        </div>
+                        <div class="compact-stack">
+                            <div>
+                                <div class="helper dashboard-mini-label">Current working directory</div>
+                                <div id="scope-current" class="workspace-path">Loading...</div>
+                            </div>
+                            <div class="helper" id="scope-meta">Loading configuration paths...</div>
+                            <div class="field-stack">
+                                <label for="scope-input">Change project folder</label>
+                                <input id="scope-input" type="text" placeholder="/home/user/my-project" autocomplete="off">
+                                <p class="help-text">Use an absolute path, a relative path, or <code>~/project</code>. Herd will create or refresh <code>.herd/</code> there.</p>
+                            </div>
+                            <label class="choice-row">
+                                <input type="checkbox" id="scope-sync-env" checked>
+                                <span class="choice-copy">
+                                    <strong>Keep <code>.env</code> in sync</strong>
+                                    <span>Recommended so the dashboard and terminal commands keep pointing to the same project.</span>
+                                </span>
+                            </label>
+                            <div class="footer-actions">
+                                <button id="scope-save-btn" type="button">Update workspace</button>
+                            </div>
+                            <div id="scope-feedback"></div>
+                        </div>
                     </div>
-                    <label class="choice-row">
-                        <input type="checkbox" id="scope-sync-env" checked style="margin-top: 3px;">
-                        <span class="choice-copy">
-                            <strong>Keep `.env` in sync</strong>
-                            <span>Recommended so the dashboard and terminal commands keep pointing to the same project.</span>
-                        </span>
-                    </label>
-                    <div class="footer-actions">
-                        <button id="scope-save-btn" type="button">Update Workspace</button>
+
+                    <div class="info-card dashboard-control-card">
+                        <div class="section-head dashboard-section-head-tight">
+                            <div>
+                                <span class="section-kicker">Access</span>
+                                <h3>Project permissions</h3>
+                            </div>
+                            <p class="section-copy">Switch between write-enabled work and report-only inspection.</p>
+                        </div>
+                        <div class="compact-stack">
+                            <label class="choice-row">
+                                <input type="checkbox" id="allow-project-changes-toggle" checked>
+                                <span class="choice-copy">
+                                    <strong>Allow this agent to change project files</strong>
+                                    <span>Turn this off when the agent should inspect and summarize instead.</span>
+                                </span>
+                            </label>
+                            <label class="choice-row">
+                                <input type="checkbox" id="access-sync-env" checked>
+                                <span class="choice-copy">
+                                    <strong>Keep <code>.env</code> in sync</strong>
+                                    <span>Useful when you also launch Herd from the terminal.</span>
+                                </span>
+                            </label>
+                            <div class="notice info" id="access-note">
+                                Write-enabled mode is active. This instance can edit the configured workspace.
+                            </div>
+                            <div class="footer-actions">
+                                <button id="access-save-btn" type="button">Update access mode</button>
+                            </div>
+                            <div id="access-feedback"></div>
+                        </div>
                     </div>
-                    <div id="scope-feedback"></div>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <section class="panel">
-            <div class="section-head">
-                <h2>Project Access</h2>
-                <p class="section-copy">
-                    Switch this instance between normal write access and report-only mode. In report-only mode, Herd writes a Markdown summary to `.herd/outputs/reports/` instead of changing the project.
-                </p>
-            </div>
-            <div class="split-grid">
-                <div class="stack">
-                    <label class="choice-row">
-                        <input type="checkbox" id="allow-project-changes-toggle" checked style="margin-top: 3px;">
-                        <span class="choice-copy">
-                            <strong>Allow this agent to change project files</strong>
-                            <span>Turn this off when the agent should only inspect and summarize.</span>
-                        </span>
-                    </label>
-                    <label class="choice-row">
-                        <input type="checkbox" id="access-sync-env" checked style="margin-top: 3px;">
-                        <span class="choice-copy">
-                            <strong>Keep `.env` in sync</strong>
-                            <span>Useful when you also launch Herd from the terminal.</span>
-                        </span>
-                    </label>
-                </div>
-                <div class="stack">
-                    <div class="notice info" id="access-note">
-                        Write-enabled mode is active. This instance can edit the configured workspace.
+            <section class="panel dashboard-panel dashboard-actions-panel" id="dashboard-actions">
+                <div class="section-head dashboard-section-head dashboard-section-head-stack">
+                    <div>
+                        <span class="section-kicker">Parallel paths</span>
+                        <h2>Choose what changes</h2>
                     </div>
-                    <div class="footer-actions">
-                        <button id="access-save-btn" type="button">Update Access Mode</button>
-                    </div>
-                    <div id="access-feedback"></div>
+                    <p class="section-copy">Editing this instance and creating another active agent stay separated on purpose.</p>
                 </div>
-            </div>
-        </section>
+                <div class="card-grid dashboard-action-grid">
+                    <div class="info-card dashboard-action-card">
+                        <div class="dashboard-card-meta">
+                            <span class="tag recommended">Recommended</span>
+                            <span class="dashboard-card-index">01</span>
+                        </div>
+                        <h3>Reconfigure this instance</h3>
+                        <p class="helper">
+                            Keep the current <code>config.json</code> path and edit bot, alias, workspace, or permissions for this same agent.
+                        </p>
+                        <a class="dashboard-button-link" href="/setup?flow=reconfigure">Open reconfigure flow</a>
+                    </div>
+                    <div class="info-card dashboard-action-card">
+                        <div class="dashboard-card-meta">
+                            <span class="tag warning">Separate instance</span>
+                            <span class="dashboard-card-index">02</span>
+                        </div>
+                        <h3>Add another active agent</h3>
+                        <p class="helper">
+                            Use this when you want a second alias online at the same time with a separate config and process.
+                        </p>
+                        <a class="dashboard-button-link dashboard-button-link-secondary" href="/setup?flow=add-agent">Open add-agent guide</a>
+                    </div>
+                </div>
+            </section>
+        </div>
 
-        <section class="panel">
-            <div class="section-head">
-                <h2>Recent Messages</h2>
-                <p class="section-copy">Last messages recorded for this instance today.</p>
-            </div>
-            <div id="messages-content">Loading...</div>
-        </section>
-
-        <section class="panel">
-            <div class="section-head">
-                <h2>Scheduled Tasks (CRON)</h2>
-                <p class="section-copy">Active background tasks that target agents in this Telegram group.</p>
-            </div>
-            <div id="cron-content">Loading...</div>
-        </section>
-
-        <section class="panel">
-            <div class="section-head">
-                <h2>Members</h2>
-                <p class="section-copy">Agents currently registered in this Herd group.</p>
-            </div>
-            <div id="members-content">Loading...</div>
-        </section>
     </div>
 
     <script>
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
         function escapeHtml(unsafe) {
             return (unsafe || '').toString()
                 .replace(/&/g, "&amp;")
@@ -218,13 +187,46 @@
                 .replace(/'/g, "&#039;");
         }
 
-        function formatTime(isoStr) {
-            const d = new Date(isoStr)
-            return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
-        }
-
         function accessModeLabel(data) {
             return data?.access_mode === 'report-only' ? 'Report-only' : 'Write enabled'
+        }
+
+        function animateElement(element, className = 'panel-enter') {
+            if (!element || prefersReducedMotion) return
+            element.classList.remove(className)
+            void element.offsetWidth
+            element.classList.add(className)
+            window.setTimeout(() => element.classList.remove(className), 500)
+        }
+
+        function setTextWithRefresh(id, nextValue) {
+            const element = document.getElementById(id)
+            if (!element) return
+            const value = `${nextValue || ''}`
+            if (element.textContent !== value) {
+                element.textContent = value
+                animateElement(element, 'is-refreshed')
+            }
+        }
+
+        function setHtmlWithRefresh(id, nextValue) {
+            const element = document.getElementById(id)
+            if (!element) return
+            if (element.innerHTML !== nextValue) {
+                element.innerHTML = nextValue
+                animateElement(element, 'is-refreshed')
+            }
+        }
+
+        function setMetricState(id, state) {
+            const element = document.getElementById(id)
+            if (!element) return
+
+            if (state) {
+                element.dataset.state = state
+            } else {
+                delete element.dataset.state
+            }
         }
 
         function renderStatus(data) {
@@ -232,28 +234,12 @@
             const isOnline = data.online ? 'Online' : 'Offline'
             const accessMode = accessModeLabel(data)
 
-            document.getElementById('hero-alias').textContent = aliasStr
-            document.getElementById('hero-scope').textContent = data.scope || 'Not configured'
-            document.getElementById('hero-access').textContent = accessMode
-
-            document.getElementById('status-content').innerHTML = `
-                <div class="metric">
-                    <span class="metric-label">Status</span>
-                    <span class="metric-value">${escapeHtml(isOnline)}</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Agent</span>
-                    <span class="metric-value">${escapeHtml(aliasStr)}</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Workspace</span>
-                    <span class="metric-value">${escapeHtml(data.scope || 'Not configured')}</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Access Mode</span>
-                    <span class="metric-value">${escapeHtml(accessMode)}</span>
-                </div>
-            `
+            setTextWithRefresh('hero-status', isOnline)
+            setTextWithRefresh('hero-alias', aliasStr)
+            setTextWithRefresh('hero-scope', data.scope || 'Not configured')
+            setTextWithRefresh('hero-access', accessMode)
+            setMetricState('hero-status', data.online ? 'online' : 'offline')
+            setMetricState('hero-access', data?.access_mode === 'report-only' ? 'report-only' : 'write-enabled')
         }
 
         let lastKnownScope = ''
@@ -265,8 +251,8 @@
             const envPath = configState?.env_path || '.env'
             const input = document.getElementById('scope-input')
 
-            document.getElementById('scope-current').textContent = scope || 'Not configured yet'
-            document.getElementById('scope-meta').innerHTML = `Config source: <code>${escapeHtml(configPath)}</code> | Optional CLI sync: <code>${escapeHtml(envPath)}</code>`
+            setTextWithRefresh('scope-current', scope || 'Not configured yet')
+            setHtmlWithRefresh('scope-meta', `Config source: <code>${escapeHtml(configPath)}</code> | Optional CLI sync: <code>${escapeHtml(envPath)}</code>`)
 
             if (scope && (!input.dataset.dirty || input.value === '' || input.value === lastKnownScope)) {
                 input.value = scope
@@ -280,60 +266,6 @@
                 : 'Write-enabled mode is active. This instance can edit the configured workspace.'
 
             lastKnownScope = scope
-        }
-
-        function renderMessages(data) {
-            const content = document.getElementById('messages-content')
-            if (!data || data.length === 0) {
-                content.innerHTML = '<p class="helper">No messages recorded today.</p>'
-                return
-            }
-
-            content.innerHTML = data.map(m => `
-                <div class="message">
-                    <span class="ts">[${formatTime(m.ts)}]</span>
-                    <span class="sender">${escapeHtml(m.from)}:</span>
-                    <span>${escapeHtml(m.text)}</span>
-                </div>
-            `).join('')
-        }
-
-        function renderMembers(members) {
-            const content = document.getElementById('members-content')
-            if (!members || members.length === 0) {
-                content.innerHTML = '<p class="helper">No members found.</p>'
-                return
-            }
-
-            content.innerHTML = `
-                <div class="summary-grid">
-                    ${members.map(m => `
-                        <div class="metric">
-                            <span class="metric-label">${escapeHtml(m.cargo)}</span>
-                            <span class="metric-value">@${escapeHtml(m.alias)}</span>
-                        </div>
-                    `).join('')}
-                </div>
-            `
-        }
-
-        function renderCron(tasks) {
-            const content = document.getElementById('cron-content')
-            if (!tasks || tasks.length === 0) {
-                content.innerHTML = '<p class="helper">No active scheduled tasks.</p>'
-                return
-            }
-
-            content.innerHTML = `
-                <div class="stack">
-                    ${tasks.map(t => `
-                        <div class="metric">
-                            <span class="metric-label">@${escapeHtml(t.alias)} | ${escapeHtml(t.cron)}</span>
-                            <span class="metric-value">${escapeHtml(t.task)}</span>
-                        </div>
-                    `).join('')}
-                </div>
-            `
         }
 
         async function updateScope() {
@@ -350,6 +282,7 @@
 
             button.disabled = true
             feedback.innerHTML = '<div class="flash">Updating workspace...</div>'
+            button.classList.add('is-working')
 
             try {
                 const res = await fetch('/api/update-scope', {
@@ -367,11 +300,14 @@
                 input.dataset.dirty = ''
                 lastKnownScope = data.scope
                 feedback.innerHTML = `<div class="flash success">Workspace updated to <code>${escapeHtml(data.scope)}</code>.</div>`
+                animateElement(feedback.firstElementChild)
                 await refreshDashboard()
             } catch (err) {
                 feedback.innerHTML = `<div class="flash error">${escapeHtml(err.message || 'Failed to update workspace.')}</div>`
+                animateElement(feedback.firstElementChild)
             } finally {
                 button.disabled = false
+                button.classList.remove('is-working')
             }
         }
 
@@ -383,6 +319,7 @@
 
             button.disabled = true
             feedback.innerHTML = '<div class="flash">Updating access mode...</div>'
+            button.classList.add('is-working')
 
             try {
                 const res = await fetch('/api/update-access-mode', {
@@ -398,32 +335,26 @@
 
                 const modeLabel = data.allow_project_changes ? 'write enabled' : 'report-only'
                 feedback.innerHTML = `<div class="flash success">Access mode updated: <strong>${escapeHtml(modeLabel)}</strong>.</div>`
+                animateElement(feedback.firstElementChild)
                 await refreshDashboard()
             } catch (err) {
                 feedback.innerHTML = `<div class="flash error">${escapeHtml(err.message || 'Failed to update access mode.')}</div>`
+                animateElement(feedback.firstElementChild)
             } finally {
                 button.disabled = false
+                button.classList.remove('is-working')
             }
         }
 
         async function refreshDashboard() {
             try {
-                const [statusRes, configRes, msgsRes, membersRes, cronRes] = await Promise.all([
+                const [statusRes, configRes] = await Promise.all([
                     fetch('/api/status').catch(() => null),
-                    fetch('/api/current-config').catch(() => null),
-                    fetch('/api/messages').catch(() => null),
-                    fetch('/api/members').catch(() => null),
-                    fetch('/api/cron').catch(() => null)
+                    fetch('/api/current-config').catch(() => null)
                 ])
 
                 if (statusRes && statusRes.ok) renderStatus(await statusRes.json())
                 if (configRes && configRes.ok) renderWorkspace(await configRes.json())
-                if (msgsRes && msgsRes.ok) renderMessages((await msgsRes.json()).messages || [])
-                if (membersRes && membersRes.ok) renderMembers((await membersRes.json()).members || [])
-                if (cronRes && cronRes.ok) {
-                    const data = await cronRes.json()
-                    renderCron((data.tasks || []).filter(t => t.active))
-                }
             } catch (err) {
                 console.error('Failed to refresh dashboard:', err)
             }

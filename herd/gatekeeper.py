@@ -560,6 +560,21 @@ async def handle_members(update: Update, context: ContextTypes.DEFAULT_TYPE, act
     await update.message.reply_text("\n".join(lines))
 
 
+async def handle_agents(update: Update, context: ContextTypes.DEFAULT_TYPE, actor: dict, members: list, text: str):
+    aliases = sorted({str(member.get("alias", "")).lstrip("@") for member in members if member.get("alias")})
+    if not aliases:
+        await update.message.reply_text("No agents are registered in this Herd group yet.")
+        return
+
+    lines = [
+        "🤖 Agent aliases:",
+        *[f"`@{alias}`" for alias in aliases],
+        "",
+        "Tip: copy one alias above and mention it in the group message.",
+    ]
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
 async def handle_cargo(update: Update, context: ContextTypes.DEFAULT_TYPE, actor: dict, members: list, text: str):
     if actor["cargo"] not in ("OWNER", "LEAD"):
         await update.message.reply_text("❌ Permission denied.")
@@ -780,6 +795,8 @@ async def handle_scope(update: Update, context: ContextTypes.DEFAULT_TYPE, actor
 COMMANDS = {
     "/init":     handle_init,
     "/invite":   handle_invite,
+    "/agents":   handle_agents,
+    "/aliases":  handle_agents,
     "/members":  handle_members,
     "/role":     handle_cargo,
     "/cargo":    handle_cargo, # Fallback

@@ -1217,6 +1217,8 @@ class HerdUIHandler(BaseHTTPRequestHandler):
             self._serve_file(UI_DIR / "index.html", "text/html")
         elif path == "/dashboard":
             self._serve_file(UI_DIR / "dashboard.html", "text/html")
+        elif path in ("/dashboard/messages", "/dashboard/tasks", "/dashboard/members"):
+            self._serve_file(UI_DIR / "dashboard_detail.html", "text/html")
         elif path == "/herd.css":
             self._serve_file(UI_DIR / "herd.css", "text/css")
         elif path == "/logo.png":

@@ -13,16 +13,30 @@
                 <div>
                     <img src="/logo.png" alt="Herd Logo" class="logo">
                     <span class="eyebrow">Guided Setup</span>
-                    <h1>Choose the right path before this instance changes anything</h1>
-                    <p class="hero-copy">
-                        Herd now separates joining, first-time owner setup, reconfiguring the current instance, and adding another active agent.
-                        The goal is simple: no more accidental overwrites and no more confusing "switch" flows that start by asking for an invite token.
-                    </p>
+                    <h1>Set up this instance with less noise</h1>
+                    <p class="hero-copy">Choose the flow, fill the essentials, and review before saving.</p>
+                    <div class="hero-bullets">
+                        <div class="hero-bullet">
+                            <span class="hero-bullet-mark">1</span>
+                            <div>
+                                <strong>All settings stay available</strong>
+                                <span>Bot, group, alias, workspace, access mode, and agent type remain configurable.</span>
+                            </div>
+                        </div>
+                        <div class="hero-bullet">
+                            <span class="hero-bullet-mark">2</span>
+                            <div>
+                                <strong>Only the important fields come first</strong>
+                                <span>Secondary guidance stays close by instead of competing with every action.</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="panel" style="padding: 20px;">
                     <div class="section-head" style="margin-bottom: 12px;">
-                        <h3>Setup Context</h3>
-                        <p class="section-copy">This area updates as Herd inspects the current machine and config.</p>
+                        <span class="section-kicker">Context</span>
+                        <h3>What Herd found here</h3>
+                        <p class="section-copy">This updates automatically from the current machine and config files.</p>
                     </div>
                     <div class="pill-row" id="context-pills">
                         <span class="pill">Loading context...</span>
@@ -36,22 +50,22 @@
                 <div class="progress-step active" data-progress="1">
                     <span class="progress-dot">1</span>
                     <div class="progress-copy">
-                        <strong>Choose Flow</strong>
-                        <span>Pick join, owner, reconfigure, or add-agent guidance</span>
+                        <strong>Pick a path</strong>
+                        <span>Join, create, edit, or add</span>
                     </div>
                 </div>
                 <div class="progress-step" data-progress="2">
                     <span class="progress-dot">2</span>
                     <div class="progress-copy">
-                        <strong>Configure Instance</strong>
-                        <span>Bot, alias, agent type, workspace, and access rules</span>
+                        <strong>Fill essentials</strong>
+                        <span>Connection, identity, workspace</span>
                     </div>
                 </div>
                 <div class="progress-step" data-progress="3">
                     <span class="progress-dot">3</span>
                     <div class="progress-copy">
-                        <strong>Review & Save</strong>
-                        <span>Confirm exactly what this instance will become</span>
+                        <strong>Review</strong>
+                        <span>Confirm before saving</span>
                     </div>
                 </div>
             </div>
@@ -59,10 +73,9 @@
 
         <section id="step-1" class="panel">
             <div class="section-head">
-                <h2>Step 1: Choose The Flow</h2>
-                <p class="section-copy">
-                    Start by telling Herd what you actually want to do. This changes the rest of the setup so the form matches your intent instead of forcing a one-size-fits-all path.
-                </p>
+                <span class="section-kicker">Step 1</span>
+                <h2>What do you need to do?</h2>
+                <p class="section-copy">Pick the outcome first so Herd can keep the form focused.</p>
             </div>
 
             <div class="flow-grid">
@@ -71,7 +84,7 @@
                         <div class="flow-title">Join With Invite</div>
                         <span class="tag">New Instance</span>
                     </div>
-                    <p class="flow-text">Use an invite token to connect this machine as a new Herd instance inside an existing group.</p>
+                    <p class="flow-text">Connect this machine to an existing Herd with an invite token.</p>
                 </button>
 
                 <button type="button" class="flow-card" id="card-bootstrap" data-flow="bootstrap">
@@ -79,7 +92,7 @@
                         <div class="flow-title">Create Owner Instance</div>
                         <span class="tag recommended">First Run</span>
                     </div>
-                    <p class="flow-text">Bootstrap the very first owner on a fresh Herd install. No invite token needed.</p>
+                    <p class="flow-text">Create the first owner on a fresh Herd install.</p>
                 </button>
 
                 <button type="button" class="flow-card" id="card-reconfigure" data-flow="reconfigure">
@@ -87,7 +100,7 @@
                         <div class="flow-title">Reconfigure This Instance</div>
                         <span class="tag recommended">Safe Edit</span>
                     </div>
-                    <p class="flow-text">Keep this current instance and update its bot, alias, workspace, or access settings.</p>
+                    <p class="flow-text">Edit the current instance without replacing it by accident.</p>
                 </button>
 
                 <button type="button" class="flow-card" id="card-add-agent" data-flow="add-agent">
@@ -95,21 +108,19 @@
                         <div class="flow-title">Add Another Active Agent</div>
                         <span class="tag warning">Separate Process</span>
                     </div>
-                    <p class="flow-text">Open the guided explanation for creating a second active agent without replacing the current one.</p>
+                    <p class="flow-text">Prepare a second live agent with its own config and process.</p>
                 </button>
             </div>
 
             <div id="panel-join" class="detail-panel hidden">
                 <div class="section-head">
                     <h3>Join This Machine With An Invite Token</h3>
-                    <p class="section-copy">
-                        This path is for a new local instance joining an existing Herd group. Paste the invite token and Herd will preload the delegated role and scope.
-                    </p>
+                    <p class="section-copy">Paste the token and Herd will preload the delegated role and scope.</p>
                 </div>
                 <div class="field-stack">
                     <label for="token-input">Invite token</label>
                     <input id="token-input" type="text" placeholder="herd-..." autocomplete="off">
-                    <p class="help-text">If the token is valid, Herd will automatically fill the delegated role, scope, and any suggested alias.</p>
+                    <p class="help-text">A valid token can prefill role, scope, and suggested alias.</p>
                 </div>
                 <div id="token-feedback" class="feedback hidden" style="margin-top: 12px;"></div>
                 <div class="footer-actions" style="margin-top: 16px;">
@@ -120,12 +131,10 @@
             <div id="panel-bootstrap" class="detail-panel hidden">
                 <div class="section-head">
                     <h3>Create The First Owner Instance</h3>
-                    <p class="section-copy">
-                        Herd detected a fresh install. This flow prepares the owner instance for the group and skips invite-token onboarding.
-                    </p>
+                    <p class="section-copy">Fresh install detected. This path creates the first owner instance.</p>
                 </div>
                 <div class="notice success">
-                    You are setting up the first local owner instance for this Herd installation. After connecting the bot, use Telegram `/init` to bind the owner account.
+                    After connecting the bot, use Telegram <code>/init</code> to bind the owner account.
                 </div>
                 <div class="footer-actions" style="margin-top: 16px;">
                     <button id="btn-flow-bootstrap" type="button">Continue As Owner</button>
@@ -135,9 +144,7 @@
             <div id="panel-reconfigure" class="detail-panel hidden">
                 <div class="section-head">
                     <h3>Reconfigure The Current Instance</h3>
-                    <p class="section-copy">
-                        This path edits the existing local instance in place. It keeps the "replace this instance" behavior explicit and no longer asks for an invite token first.
-                    </p>
+                    <p class="section-copy">Edit the existing local instance in place. No invite token needed.</p>
                 </div>
                 <div class="summary-grid" id="reconfigure-summary">
                     <div class="metric">
@@ -157,27 +164,25 @@
             <div id="panel-add-agent" class="detail-panel hidden">
                 <div class="section-head">
                     <h3>Add Another Active Agent Without Replacing This One</h3>
-                    <p class="section-copy">
-                        A second active agent needs its own config path and its own running process. This guide keeps that separate from "reconfigure this instance" so the current agent is not overwritten by accident.
-                    </p>
+                    <p class="section-copy">A second active agent should live in its own config path and process.</p>
                 </div>
                 <div class="notice warn">
-                    One Telegram account can own multiple aliases, but two agents online at the same time should run as separate Herd instances. In practice, that usually means a separate bot token per active agent instance.
+                    The current instance stays untouched. The new one should use separate runtime files and, in practice, usually a separate bot token.
                 </div>
                 <div class="card-grid" style="margin-top: 16px;">
                     <div class="info-card" style="padding: 18px;">
                         <div class="field-stack">
                             <label for="new-config-name">Suggested config file for the new agent</label>
                             <input id="new-config-name" type="text" value="config.second-agent.json" autocomplete="off">
-                            <p class="help-text">Use any name you want. Herd will keep this current instance untouched and point the new one to its own config path.</p>
+                            <p class="help-text">Use any name. This current instance will stay untouched.</p>
                         </div>
                         <div class="field-stack" style="margin-top: 14px;">
                             <label for="new-env-name">Suggested env file for the new agent</label>
                             <input id="new-env-name" type="text" value=".env.second-agent" autocomplete="off">
-                            <p class="help-text">Use a separate env file too, so the new setup does not inherit the current agent alias, scope, bot token, and Telegram settings from the first instance.</p>
+                            <p class="help-text">Use a separate env file so alias, scope, token, and Telegram settings do not mix.</p>
                         </div>
                         <div class="notice info" style="margin-top: 14px;">
-                            Herd cannot start a second local process directly from this browser page. The commands below are only copied, not executed.
+                            The commands below are only copied, not executed from this page.
                         </div>
                         <div class="summary-grid" style="margin-top: 14px;">
                             <div class="metric">
@@ -197,7 +202,7 @@
                         <div class="status-list" style="margin-top: 14px;">
                             <div class="status-item ok">1. Open a new terminal window or tab.</div>
                             <div class="status-item ok">2. Go to the Herd folder shown above.</div>
-                            <div class="status-item ok">3. Run the setup command below to create the second config file and second env file.</div>
+                            <div class="status-item ok">3. Run the setup command to create the second config and env file.</div>
                         </div>
                         <div class="inline-actions">
                             <button type="button" class="btn-secondary" id="copy-setup-command">Copy Setup Command</button>
@@ -206,12 +211,12 @@
                     <div class="info-card" style="padding: 18px;">
                         <div class="section-head" style="margin-bottom: 10px;">
                             <h3>Start The New Agent Later</h3>
-                            <p class="section-copy">After the new setup is saved, use the same config path to launch that second instance.</p>
+                            <p class="section-copy">After setup is saved, use the same config path to launch the second instance.</p>
                         </div>
                         <div class="code-block" id="add-agent-start-command"></div>
                         <div class="status-list" style="margin-top: 14px;">
                             <div class="status-item">4. Finish the new setup in the browser window opened by that command.</div>
-                            <div class="status-item">5. In another terminal, run the start command below when you want the second agent online.</div>
+                            <div class="status-item">5. Run the start command later when you want the second agent online.</div>
                         </div>
                         <div class="inline-actions">
                             <button type="button" class="btn-secondary" id="copy-start-command">Copy Start Command</button>
@@ -225,22 +230,20 @@
 
         <section id="step-2" class="panel hidden">
             <div class="section-head">
-                <h2>Step 2: Configure This Instance</h2>
-                <p class="section-copy" id="step-2-copy">
-                    Fill in the connection and agent settings for this Herd instance.
-                </p>
+                <span class="section-kicker">Step 2</span>
+                <h2>Fill the essentials</h2>
+                <p class="section-copy" id="step-2-copy">Fill in the connection and agent settings for this Herd instance.</p>
             </div>
 
             <div class="pill-row" id="selected-flow-pills"></div>
 
             <div class="split-grid" style="margin-top: 18px;">
-                <div class="stack">
+                <div class="compact-stack">
                     <div class="info-card" style="padding: 18px;">
                         <div class="section-head" style="margin-bottom: 12px;">
-                            <h3>Telegram Connection</h3>
-                            <p class="section-copy">
-                                Connect a bot to the target Telegram group. If this instance is already configured, you can keep the stored bot and group or reconnect them.
-                            </p>
+                            <span class="section-kicker">Connection</span>
+                            <h3>Telegram</h3>
+                            <p class="section-copy">Connect a bot and pair the target group.</p>
                         </div>
                         <div class="field-stack">
                             <label for="bot-token">Telegram Bot Token</label>
@@ -256,7 +259,7 @@
                         <div id="group-pairing-section" class="detail-panel hidden" style="margin-top: 14px;">
                             <div class="section-head">
                                 <h3>Link The Telegram Group</h3>
-                                <p class="section-copy">Add the bot to the group, then send the exact command below in that group chat.</p>
+                                <p class="section-copy">Add the bot to the group, then send the exact command below.</p>
                             </div>
                             <div class="code-block"><strong id="pin-display">/init 1234</strong></div>
                             <p id="pairing-status" class="helper" style="margin-top: 12px;">Waiting for message in Telegram...</p>
@@ -266,8 +269,9 @@
 
                     <div class="info-card" style="padding: 18px;">
                         <div class="section-head" style="margin-bottom: 12px;">
-                            <h3>Agent Identity</h3>
-                            <p class="section-copy">Choose how this instance will appear and where it will work.</p>
+                            <span class="section-kicker">Identity</span>
+                            <h3>Agent And Workspace</h3>
+                            <p class="section-copy">Choose the runtime, alias, and project folder.</p>
                         </div>
                         <div class="field-stack">
                             <label>Agent Type</label>
@@ -316,7 +320,7 @@
                                 <option value="antigravity">Antigravity</option>
                                 <option value="vscode-generic">Other VSCode Extension</option>
                             </select>
-                            <p class="help-text">Herd writes tasks to <code>.herd/tasks/pending.json</code> and your editor-side agent picks them up.</p>
+                            <p class="help-text">Herd writes tasks to <code>.herd/tasks/pending.json</code> for the editor-side agent.</p>
                         </div>
                         <div id="custom-command-wrap" class="field-stack hidden" style="margin-top: 14px;">
                             <label for="agent-custom">Custom command</label>
@@ -330,16 +334,15 @@
                         <div class="field-stack" style="margin-top: 14px;">
                             <label for="scope">Project folder</label>
                             <input type="text" id="scope" placeholder="/home/user/my-project" autocomplete="off">
-                            <p class="help-text">
-                                This is the root of the project this instance will work on. Herd stores local context in <code>.herd/</code> inside this directory.
-                            </p>
+                            <p class="help-text">Herd stores local context in <code>.herd/</code> inside this folder.</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="stack">
+                <div class="compact-stack">
                     <div id="machine-hints" class="info-card hidden" style="padding: 18px;">
                         <div class="section-head" style="margin-bottom: 12px;">
+                            <span class="section-kicker">Suggestions</span>
                             <h3>Quick Fill For This Machine</h3>
                             <p class="section-copy" id="machine-summary"></p>
                         </div>
@@ -351,34 +354,26 @@
                         <ul id="runtime-checks" class="status-list" style="margin-top: 14px;"></ul>
                     </div>
 
-                    <div class="info-card" style="padding: 18px;">
-                        <div class="section-head" style="margin-bottom: 12px;">
-                            <h3>Project Access</h3>
-                            <p class="section-copy">Decide whether this instance is allowed to change the project or only generate reports.</p>
+                    <details class="details-card" open>
+                        <summary>Access and storage</summary>
+                        <div class="details-body compact-stack">
+                            <label class="choice-row">
+                                <input type="checkbox" id="allow-project-changes" checked style="margin-top: 3px;">
+                                <span class="choice-copy">
+                                    <strong>Allow this agent to change project files</strong>
+                                    <span>If disabled, Herd switches to report-only mode and saves Markdown reports in <code>.herd/outputs/reports</code>.</span>
+                                </span>
+                            </label>
+                            <label class="choice-row">
+                                <input type="checkbox" id="sync-env" checked style="margin-top: 3px;">
+                                <span class="choice-copy">
+                                    <strong>Keep CLI settings synced in <code>.env</code></strong>
+                                    <span>Recommended. The bot token still stays only in <code>.env</code>.</span>
+                                </span>
+                            </label>
+                            <div id="storage-targets" class="notice info"></div>
                         </div>
-                        <label class="choice-row">
-                            <input type="checkbox" id="allow-project-changes" checked style="margin-top: 3px;">
-                            <span class="choice-copy">
-                                <strong>Allow this agent to change project files</strong>
-                                <span>If disabled, Herd switches to report-only mode and saves Markdown reports in <code>.herd/outputs/reports</code>.</span>
-                            </span>
-                        </label>
-                    </div>
-
-                    <div class="info-card" style="padding: 18px;">
-                        <div class="section-head" style="margin-bottom: 12px;">
-                            <h3>Config Storage</h3>
-                            <p class="section-copy">Keep terminal commands and the dashboard aligned by syncing non-secret settings to `.env`.</p>
-                        </div>
-                        <label class="choice-row">
-                            <input type="checkbox" id="sync-env" checked style="margin-top: 3px;">
-                            <span class="choice-copy">
-                                <strong>Keep CLI settings synced in `.env`</strong>
-                                <span>Recommended. The bot token still stays only in `.env`.</span>
-                            </span>
-                        </label>
-                        <div id="storage-targets" class="notice info" style="margin-top: 14px;"></div>
-                    </div>
+                    </details>
                 </div>
             </div>
 
@@ -390,10 +385,9 @@
 
         <section id="step-3" class="panel hidden">
             <div class="section-head">
-                <h2>Step 3: Review & Save</h2>
-                <p class="section-copy" id="review-copy">
-                    Confirm the exact outcome before this instance is saved.
-                </p>
+                <span class="section-kicker">Step 3</span>
+                <h2>Review before saving</h2>
+                <p class="section-copy" id="review-copy">Confirm the exact outcome before this instance is saved.</p>
             </div>
             <div id="summary" class="summary-grid"></div>
             <div id="will-create" class="notice info" style="margin-top: 16px;"></div>
@@ -416,6 +410,8 @@
             setupData: null,
             requestedFlow: new URLSearchParams(window.location.search).get('flow') || ''
         }
+
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
         function normalizeAlias(value) {
             return (value || '')
@@ -489,10 +485,10 @@
 
         function flowSummary(flow) {
             return {
-                join: 'This machine will join an existing Herd using an invite token.',
-                bootstrap: 'This machine will become the first owner instance for the Herd install.',
-                reconfigure: 'You are editing the current instance in place.',
-                'add-agent': 'You are viewing the guided path for a second active agent.'
+                join: 'Join an existing Herd with an invite token.',
+                bootstrap: 'Create the first owner instance for this install.',
+                reconfigure: 'Edit the current instance in place.',
+                'add-agent': 'Prepare a second active agent.'
             }[flow] || ''
         }
 
@@ -500,8 +496,8 @@
             return {
                 join: 'Configure the new instance that will join an existing Herd group.',
                 bootstrap: 'Connect the owner bot and finish the first local owner instance.',
-                reconfigure: 'Edit the current instance safely. Invite tokens are not required for this path.',
-                'add-agent': 'A second active agent should use a separate config path. Use the guide above or switch to reconfigure if you intend to replace this instance.'
+                reconfigure: 'Edit the current instance safely.',
+                'add-agent': 'A second active agent should use a separate config path.'
             }[flow] || 'Fill in the connection and agent settings for this Herd instance.'
         }
 
@@ -513,6 +509,25 @@
             }[flow] || 'Save This Instance'
         }
 
+        function animateElement(element, className = 'panel-enter') {
+            if (!element || prefersReducedMotion) return
+            element.classList.remove(className)
+            void element.offsetWidth
+            element.classList.add(className)
+            window.setTimeout(() => element.classList.remove(className), 500)
+        }
+
+        function scrollToElement(element) {
+            if (!element) return
+            element.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' })
+        }
+
+        function focusField(selector) {
+            const element = document.querySelector(selector)
+            if (!element || typeof element.focus !== 'function') return
+            window.setTimeout(() => element.focus({ preventScroll: true }), prefersReducedMotion ? 0 : 180)
+        }
+
         function updateProgress(step) {
             document.querySelectorAll('[data-progress]').forEach(el => {
                 const index = parseInt(el.dataset.progress, 10)
@@ -522,10 +537,26 @@
         }
 
         function goToStep(step) {
-            document.getElementById('step-1').classList.toggle('hidden', step !== 1)
-            document.getElementById('step-2').classList.toggle('hidden', step !== 2)
-            document.getElementById('step-3').classList.toggle('hidden', step !== 3)
+            const sections = {
+                1: document.getElementById('step-1'),
+                2: document.getElementById('step-2'),
+                3: document.getElementById('step-3')
+            }
+
+            Object.entries(sections).forEach(([index, section]) => {
+                section.classList.toggle('hidden', Number(index) !== step)
+            })
             updateProgress(step)
+
+            const activeSection = sections[step]
+            animateElement(activeSection)
+            scrollToElement(activeSection)
+
+            if (step === 2) {
+                focusField('#bot-token')
+            } else if (step === 3) {
+                focusField('#btn-start')
+            }
         }
 
         function renderContextPills() {
@@ -550,15 +581,15 @@
 
             let note = 'Choose a flow to begin.'
             if (state.requestedFlow === 'reconfigure' && hasCompleteConfig()) {
-                note = 'You came from the dashboard to reconfigure the current instance, so Herd will open the edit path directly.'
+                note = 'Dashboard shortcut detected. Herd will open the edit path directly.'
             } else if (state.requestedFlow === 'add-agent' && hasCompleteConfig()) {
-                note = 'You came from the dashboard to add another active agent, so Herd is showing the separate-instance guide first.'
+                note = 'Dashboard shortcut detected. Herd is showing the separate-instance guide first.'
             } else if (state.isFirstRun) {
-                note = 'Fresh install detected. The owner setup path is ready.'
+                note = 'Fresh install detected. The owner path is ready.'
             } else if (hasCompleteConfig()) {
-                note = 'A configured instance already exists here. Reconfigure it safely or open the add-agent guide for a second active instance.'
+                note = 'A configured instance already exists here. Reconfigure it or open the add-agent guide.'
             } else {
-                note = 'No complete instance is configured yet. Joining with an invite is the normal path.'
+                note = 'No complete instance is configured yet. Joining with an invite is the usual path.'
             }
 
             document.getElementById('setup-context-note').textContent = note
@@ -583,7 +614,11 @@
                 panel.classList.add('hidden')
             })
             const panel = document.getElementById(`panel-${flow}`)
-            if (panel) panel.classList.remove('hidden')
+            if (panel) {
+                panel.classList.remove('hidden')
+                animateElement(panel)
+                scrollToElement(panel)
+            }
 
             document.getElementById('step-2-copy').textContent = flowStep2Copy(flow)
             document.getElementById('selected-flow-pills').innerHTML = `
@@ -592,6 +627,12 @@
             `
             document.getElementById('review-copy').textContent = flowSummary(flow)
             document.getElementById('btn-start').textContent = flowSaveLabel(flow)
+
+            if (flow === 'join') {
+                focusField('#token-input')
+            } else if (flow === 'add-agent') {
+                focusField('#new-config-name')
+            }
         }
 
         function updateAliasHelp() {
@@ -634,7 +675,7 @@
             if (diagnostics.detected_agent_labels && diagnostics.detected_agent_labels.length) {
                 detectedAgents.innerHTML = `Detected CLI agent(s): <strong>${escapeHtml(diagnostics.detected_agent_labels.join(', '))}</strong>.`
             } else {
-                detectedAgents.textContent = 'No supported CLI agent was auto-detected. You can still use VSCode watcher mode or a custom CLI command.'
+                detectedAgents.textContent = 'No supported CLI agent was auto-detected. You can still use VSCode watcher mode or a custom command.'
             }
 
             const packageOk = diagnostics.required_packages_ready
@@ -645,7 +686,7 @@
             const recommendedAgent = diagnostics.agents?.find(agent => agent.type === diagnostics.recommended_agent)
             const recommendedAgentText = diagnostics.detected_agent_labels?.length
                 ? `Recommended agent for this machine: ${recommendedAgent?.label || diagnostics.recommended_agent}.`
-                : 'Pick the agent you want Herd to talk to.'
+                : 'Pick the agent you want Herd to use.'
 
             checks.innerHTML = `
                 <li class="status-item ok">Python ${escapeHtml(diagnostics.python?.version || 'ready')} is available for Herd.</li>
@@ -703,11 +744,11 @@
                 : 'Project changes stay disabled and Herd saves Markdown reports in <code>.herd/outputs/reports</code>.'
 
             if (syncEnv) {
-                storageTargets.innerHTML = `The UI will keep non-secret settings in <code>${escapeHtml(configPath)}</code> and <code>${escapeHtml(envPath)}</code> in sync. The bot token stays only in <code>${escapeHtml(envPath)}</code>. ${accessText}`
-                willCreate.innerHTML = 'This will update the current instance config, keep the bot token in <code>.env</code>, sync the remaining CLI settings when requested, and initialize or refresh <code>.herd/</code> in the selected project.'
+                storageTargets.innerHTML = `Non-secret settings stay synced between <code>${escapeHtml(configPath)}</code> and <code>${escapeHtml(envPath)}</code>. The bot token stays only in <code>${escapeHtml(envPath)}</code>. ${accessText}`
+                willCreate.innerHTML = 'This saves the instance config, keeps the bot token in <code>.env</code>, syncs the remaining CLI settings, and initializes or refreshes <code>.herd/</code> in the selected project.'
             } else {
-                storageTargets.innerHTML = `The UI will update <code>${escapeHtml(configPath)}</code>. The bot token still stays only in <code>${escapeHtml(envPath)}</code>. ${accessText}`
-                willCreate.innerHTML = 'This will update the current instance config, keep the bot token in <code>.env</code>, and initialize or refresh <code>.herd/</code> in the selected project.'
+                storageTargets.innerHTML = `The UI updates <code>${escapeHtml(configPath)}</code>. The bot token still stays only in <code>${escapeHtml(envPath)}</code>. ${accessText}`
+                willCreate.innerHTML = 'This saves the instance config, keeps the bot token in <code>.env</code>, and initializes or refreshes <code>.herd/</code> in the selected project.'
             }
         }
 
@@ -748,7 +789,7 @@
             const hasGroup = Boolean(config.telegram_group_id)
 
             if (state.hasStoredBotToken && hasGroup) {
-                note.innerHTML = `Current group already linked (ID: ${escapeHtml(config.telegram_group_id)}). Leave the token field empty to keep the stored bot for this instance, or connect another one below.`
+                note.innerHTML = `Current group already linked (ID: ${escapeHtml(config.telegram_group_id)}). Leave the token field empty to keep the stored bot, or connect another one below.`
                 note.className = 'notice success'
                 note.classList.remove('hidden')
                 document.getElementById('group-id').value = config.telegram_group_id
@@ -837,11 +878,13 @@
                 }
 
                 tokenFeedback.classList.remove('hidden')
+                animateElement(tokenFeedback)
             } catch (err) {
                 const tokenFeedback = document.getElementById('token-feedback')
                 tokenFeedback.className = 'feedback error'
                 tokenFeedback.textContent = 'Error connecting to server.'
                 tokenFeedback.classList.remove('hidden')
+                animateElement(tokenFeedback)
                 document.getElementById('btn-flow-join').disabled = true
                 state.tokenData = null
             }
@@ -895,10 +938,13 @@
             groupStatusNote.classList.add('hidden')
             document.getElementById('btn-verify-token').disabled = true
             document.getElementById('btn-verify-token').textContent = 'Connecting...'
+            document.getElementById('btn-verify-token').classList.add('is-working')
 
             const pin = Math.floor(1000 + Math.random() * 9000)
             document.getElementById('pin-display').textContent = `/init ${pin}`
             document.getElementById('group-pairing-section').classList.remove('hidden')
+            animateElement(document.getElementById('group-pairing-section'))
+            scrollToElement(document.getElementById('group-pairing-section'))
 
             const statusEl = document.getElementById('pairing-status')
             statusEl.textContent = 'Waiting for message in Telegram...'
@@ -919,14 +965,17 @@
                 }
                 state.lastVerifiedToken = token
                 document.getElementById('btn-verify-token').textContent = 'Reconnect Bot'
+                animateElement(document.getElementById('group-pairing-section'))
             } catch (err) {
                 statusEl.textContent = `Pairing failed: ${err.message || 'Unknown error.'}`
                 tokenError.textContent = err.message || 'Failed to pair bot.'
                 tokenError.className = 'feedback error'
                 tokenError.classList.remove('hidden')
+                animateElement(tokenError)
                 document.getElementById('btn-verify-token').textContent = 'Try Again'
             } finally {
                 document.getElementById('btn-verify-token').disabled = false
+                document.getElementById('btn-verify-token').classList.remove('is-working')
             }
         }
 
@@ -985,7 +1034,7 @@
             const accessMode = setupData.allow_project_changes ? 'Can change project files' : 'Report-only (.md in .herd/outputs/reports)'
             const settingsTarget = setupData.sync_env ? 'config + .env kept in sync' : 'config only, token still in .env'
             const impactText = setupData.flow === 'reconfigure'
-                ? 'This will replace the current local instance settings.'
+                ? 'This will update the current local instance settings.'
                 : setupData.flow === 'bootstrap'
                     ? 'This will create the first owner instance for this install.'
                     : 'This will create a joined local instance from an invite token.'
@@ -1171,6 +1220,7 @@
             const btn = document.getElementById('btn-start')
             btn.disabled = true
             btn.textContent = 'Saving...'
+            btn.classList.add('is-working')
 
             try {
                 const res = await fetch('/api/setup', {
@@ -1189,6 +1239,7 @@
                 alert(`Setup failed: ${err.message || 'Unknown error.'}`)
                 btn.disabled = false
                 btn.textContent = flowSaveLabel(state.selectedFlow)
+                btn.classList.remove('is-working')
             }
         })
 

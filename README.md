@@ -123,6 +123,13 @@ Example:
 - If both agents need to stay online simultaneously, run two separate Herd instances, each with its own bot token.
 - If only one agent will be active, one bot and one Herd instance are enough.
 
+Important UX note:
+
+- Telegram's `@` autocomplete only suggests real Telegram users and bots that are already in the chat.
+- Herd aliases such as `@agent_backend` are internal routing names, not separate Telegram accounts.
+- Because of that, they usually will not appear in Telegram's native mention picker unless the alias is also the username of a real bot or account in the group.
+- Use `/agents` to get a copy-friendly list of Herd aliases registered in the current group.
+
 ### 2. Configure Your Agent
 If you use `./start.sh`, Herd opens the setup UI and writes `config.json` for you.
 That is the default onboarding flow and the easiest option for new users.
@@ -239,6 +246,7 @@ The invited developer then needs to DM the generated `herd-...` token to the Bot
 
 ### Role Management Commands (Group Chat)
 - `/invite ...` - Generates a new onboarding token.
+- `/agents` - Lists registered agent aliases in a copy-friendly format for mentions.
 - `/members` - Lists all connected agents and their roles.
 - `/role @alias NEW_ROLE` - Promotes or demotes an agent.
 - `/delegate @alias true/false` - Allows an OWNER to let a LEAD generate invite tokens.

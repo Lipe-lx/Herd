@@ -792,6 +792,49 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(invite_message.replies)
         self.assertEqual(gatekeeper.load_tokens()["tokens"], [])
 
+    async def test_agents_command_lists_copyable_aliases_for_registered_members(self):
+        gatekeeper.save_members({
+            "members": [
+                {
+                    "telegram_id": self.owner.id,
+                    "telegram_username": self.owner.username,
+                    "alias": "agent_owner",
+                    "agent": "gemini",
+                    "scope": self.config["scope"],
+                    "cargo": "OWNER",
+                    "token_delegation": True,
+                    "invited_by": "system",
+                    "invite_token": "bootstrap",
+                    "registered_at": "now",
+                    "online": True,
+                },
+                {
+                    "telegram_id": self.dev.id,
+                    "telegram_username": self.dev.username,
+                    "alias": "agent_dev",
+                    "agent": "codex",
+                    "scope": self.config["scope"],
+                    "cargo": "DEV",
+                    "token_delegation": False,
+                    "invited_by": "agent_owner",
+                    "invite_token": "herd-test",
+                    "registered_at": "now",
+                    "online": True,
+                },
+            ]
+        })
+
+        message = FakeMessage("/agents", self.group_chat, self.dev)
+
+        await gatekeeper.dispatch_command(FakeUpdate(message), FakeContext(self.bot))
+
+        self.assertTrue(message.replies)
+        reply = message.replies[-1]
+        self.assertIn("Agent aliases", reply["text"])
+        self.assertIn("`@agent_dev`", reply["text"])
+        self.assertIn("`@agent_owner`", reply["text"])
+        self.assertEqual(reply["kwargs"].get("parse_mode"), "Markdown")
+
     async def test_group_init_bootstraps_owner_from_runtime_config(self):
         self.config["cargo"] = "OWNER"
         self.config["alias"] = "agent_owner"
