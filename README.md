@@ -123,6 +123,37 @@ Example:
 - If both agents need to stay online simultaneously, run two separate Herd instances, each with its own bot token.
 - If only one agent will be active, one bot and one Herd instance are enough.
 
+### Starting Additional Agents
+
+When you want a second or third agent on the same machine, start each one with its own config and env file.
+That keeps aliases, scopes, and bot tokens separated per Herd instance.
+
+Example for a second agent:
+
+```bash
+ENV_PATH=.env.second-agent CONFIG_PATH=./config.second-agent.json ./start.sh setup
+```
+
+This opens a new setup flow and saves the second agent's runtime values into `config.second-agent.json` and `.env.second-agent`.
+
+After setup is complete, start that agent with the same paths:
+
+```bash
+ENV_PATH=.env.second-agent CONFIG_PATH=./config.second-agent.json ./start.sh
+```
+
+You can repeat the same pattern for more agents, for example:
+
+```bash
+ENV_PATH=.env.qa CONFIG_PATH=./config.qa.json ./start.sh
+```
+
+Recommended rules when running more than one agent:
+
+- Keep one `ENV_PATH` and one `CONFIG_PATH` per active agent instance.
+- Use a different Telegram bot token for each agent that will stay online at the same time.
+- Always start an agent with the same `ENV_PATH` and `CONFIG_PATH` you used during its setup.
+
 Important UX note:
 
 - Telegram's `@` autocomplete only suggests real Telegram users and bots that are already in the chat.
