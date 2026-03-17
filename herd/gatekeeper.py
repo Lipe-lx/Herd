@@ -60,12 +60,14 @@ def save_runtime_config(config: dict) -> None:
     bridge.save_runtime_config(config, get_config_file(), sync_env=True)
 
 
-def update_member_scope(telegram_id: int, new_scope: str) -> bool:
+def update_member_scope(telegram_id: int, new_scope: str, alias: str | None = None) -> bool:
     data = load_members()
     updated = False
 
     for member in data["members"]:
         if member.get("telegram_id") != telegram_id:
+            continue
+        if alias and member.get("alias") != alias:
             continue
         member["scope"] = new_scope
         updated = True
@@ -215,8 +217,113 @@ def register_member(session: OnboardingSession, token_record: dict) -> dict:
     save_members(data)
     return member
 
+def find_members(telegram_id: int, members: list) -> list[dict]:
+    return [m for m in members if m.get("telegram_id") == telegram_id]
+
+
+def resolve_runtime_member(config: dict, members: list) -> dict | None:
+    alias = str(config.get("alias", "") or "").lstrip("@")
+    if alias:
+        match = next((member for member in members if member.get("alias") == alias), None)
+        if match is not None:
+            return match
+
+    telegram_id = config.get("telegram_id")
+    if telegram_id:
+        linked = find_members(telegram_id, members)
+        if len(linked) == 1:
+            return linked[0]
+
+    return None
+
+
+def _preferred_member_for_command(linked_members: list[dict]) -> dict | None:
+    if not linked_members:
+        return None
+
+    top_rank = max(ROLE_RANK.get(member.get("cargo", ""), 0) for member in linked_members)
+    top_members = [member for member in linked_members if ROLE_RANK.get(member.get("cargo", ""), 0) == top_rank]
+    if len(top_members) == 1:
+        return top_members[0]
+
+    owner_like = [member for member in top_members if member.get("cargo") == "OWNER"]
+    if owner_like:
+        top_members = owner_like
+
+    delegated = [member for member in top_members if member.get("token_delegation")]
+    if delegated:
+        top_members = delegated
+
+    return sorted(top_members, key=lambda member: str(member.get("alias", "")))[0]
+
+
+def should_process_on_instance(
+    command_word: str,
+    *,
+    config: dict,
+    sender_id: int,
+    members: list,
+) -> bool:
+    routed_commands = {
+        "/init": "OWNER",
+        "/invite": "LEAD",
+        "/members": "LEAD",
+        "/role": "LEAD",
+        "/cargo": "LEAD",
+        "/delegate": "OWNER",
+    }
+
+    required_role = routed_commands.get(command_word)
+    if required_role is None:
+        return True
+
+    linked_members = find_members(sender_id, members)
+    if not linked_members:
+        runtime_role = str(config.get("cargo", "") or "")
+        return command_word == "/init" and runtime_role == "OWNER"
+
+    preferred = _preferred_member_for_command(linked_members)
+    runtime_member = resolve_runtime_member(config, members)
+    runtime_role = str((runtime_member or preferred or {}).get("cargo") or config.get("cargo", "") or "")
+    if ROLE_RANK.get(runtime_role, 0) < ROLE_RANK.get(required_role, 0):
+        return False
+
+    runtime_alias = str((runtime_member or {}).get("alias") or "").lstrip("@")
+    preferred_alias = str((preferred or {}).get("alias") or "").lstrip("@")
+
+    if preferred_alias and runtime_alias and runtime_alias != preferred_alias:
+        return False
+
+    return True
+
+
+def resolve_actor(telegram_id: int, members: list) -> dict | None:
+    linked_members = find_members(telegram_id, members)
+    if not linked_members:
+        return None
+
+    actor = max(
+        linked_members,
+        key=lambda member: (
+            ROLE_RANK.get(member.get("cargo", ""), 0),
+            1 if member.get("token_delegation") else 0,
+        ),
+    ).copy()
+    actor["aliases"] = sorted({member.get("alias", "") for member in linked_members if member.get("alias")})
+    actor["assignments"] = len(linked_members)
+
+    highest_rank = ROLE_RANK.get(actor.get("cargo", ""), 0)
+    highest_rank_members = [
+        member for member in linked_members if ROLE_RANK.get(member.get("cargo", ""), 0) == highest_rank
+    ]
+    if actor.get("cargo") == "LEAD":
+        actor["token_delegation"] = any(member.get("token_delegation") for member in highest_rank_members)
+
+    return actor
+
+
 def find_member(telegram_id: int, members: list) -> dict | None:
-    return next((m for m in members if m["telegram_id"] == telegram_id), None)
+    return resolve_actor(telegram_id, members)
 
 
 async def bootstrap_owner(update: Update, context: ContextTypes.DEFAULT_TYPE, member):
@@ -529,7 +636,7 @@ async def handle_init(update: Update, context: ContextTypes.DEFAULT_TYPE, actor:
 
     config = load_runtime_config()
     if config.get("cargo") != "OWNER":
-        await msg.reply_text("❌ `/init` bootstrap is only available for an OWNER-configured instance.")
+        logger.info("[herd] Ignoring /init on non-OWNER instance to avoid duplicate bootstrap replies.")
         return
 
     if members:
@@ -648,7 +755,11 @@ async def handle_scope(update: Update, context: ContextTypes.DEFAULT_TYPE, actor
     if bridge_state and isinstance(bridge_state.get("config_ref"), dict):
         previous_scope = bridge_state["config_ref"].get("scope", previous_scope)
 
-    update_member_scope(actor["telegram_id"], updated["scope"])
+    update_member_scope(
+        actor["telegram_id"],
+        updated["scope"],
+        alias=str(config.get("alias") or actor.get("alias") or "").lstrip("@") or None,
+    )
 
     if live_update:
         await msg.reply_text(
@@ -697,7 +808,13 @@ async def dispatch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     data = load_members()
     members = data["members"]
     sender_id = msg.from_user.id
-    actor = find_member(sender_id, members)
+    config = load_runtime_config()
+
+    command_word = text.split(" ")[0].lower()
+    if not should_process_on_instance(command_word, config=config, sender_id=sender_id, members=members):
+        return
+
+    actor = resolve_actor(sender_id, members)
     
     if actor is None:
         if text.lower().startswith("/init"):
@@ -710,7 +827,6 @@ async def dispatch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             await msg.reply_text("You are not registered in Herd for this group. Get an invite token from the OWNER or LEAD.")
             return
 
-    command_word = text.split(" ")[0].lower()
     handler = COMMANDS.get(command_word)
     
     if handler:

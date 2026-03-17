@@ -5,173 +5,417 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Herd Setup</title>
     <link rel="stylesheet" href="/herd.css">
-    <style>
-        .hidden { display: none; }
-        .step-panel { margin-top: 20px; }
-        .steps { display: flex; gap: 10px; margin-bottom: 20px; }
-        .step { width: 30px; height: 30px; border-radius: 50%; background: #D4C9B0; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-        .step.active { background: var(--herd-brown); }
-        .bootstrap-banner { background: #EAF3DE; border: 1px solid #CEE8B4; padding: 12px 16px; border-radius: var(--herd-radius); margin-bottom: 15px; font-size: 0.9em; color: var(--herd-green); }
-        .help-text { font-size: 0.85em; color: #777; margin-top: 4px; }
-        .hint-card { margin: 16px 0 18px; padding: 16px; border-radius: var(--herd-radius); border: 1px solid var(--herd-border); background: rgba(255,255,255,0.75); }
-        .hint-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-        .hint-actions button { padding: 8px 14px; font-size: 14px; }
-        .status-list { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 8px; }
-        .status-item { padding: 10px 12px; border-radius: 8px; font-size: 0.9em; border: 1px solid transparent; }
-        .status-item.ok { background: #EAF3DE; color: #47612C; border-color: #CDE2B7; }
-        .status-item.warn { background: #FCEBEB; color: #A32D2D; border-color: #F1CACA; }
-        .inline-note { font-size: 0.9em; color: #666; margin-top: 8px; }
-    </style>
 </head>
 <body>
-    <div style="text-align: center; margin-bottom: 20px;">
-        <img src="/logo.png" alt="Herd Logo" class="logo">
-    </div>
-
-    <div class="steps">
-        <span class="step active" data-step="1">1</span>
-        <span class="step" data-step="2">2</span>
-        <span class="step" data-step="3">3</span>
-    </div>
-
-    <!-- STEP 1: Token OR Bootstrap detection -->
-    <section id="step-1" class="step-panel active">
-        <div id="loading-check" style="text-align:center; padding: 20px; color: #888;">
-            Checking environment...
-        </div>
-        <div id="token-section" class="hidden">
-            <h2>Invite Token</h2>
-            <p>Welcome to Herd. Paste the invite token you received:</p>
-            <input id="token-input" type="text" placeholder="herd-" autocomplete="off" autofocus>
-            <div id="token-feedback" class="hidden"></div>
-            <button id="btn-step1" disabled>Continue →</button>
-        </div>
-        <div id="bootstrap-section" class="hidden">
-            <h2>Welcome, Owner!</h2>
-            <div class="bootstrap-banner">
-                🐄 This is a fresh Herd install. You will be set up as the <strong>OWNER</strong> of this group — no invite token needed.
-            </div>
-            <button id="btn-bootstrap-next">Continue →</button>
-        </div>
-    </section>
-
-    <!-- STEP 2: Agent & Telegram config -->
-    <section id="step-2" class="step-panel hidden">
-        <h2>Configuration</h2>
-        <div id="config-banner" class="bootstrap-banner hidden" style="background:#F5F0E4; border-color:#E5D7B7; color:#6A5434;"></div>
-        <div id="machine-hints" class="hint-card hidden">
-            <h3 style="margin-top: 0; margin-bottom: 8px;">Quick Fill For This Machine</h3>
-            <p id="machine-summary" style="margin: 0;"></p>
-            <p id="detected-agents" class="inline-note"></p>
-            <div class="hint-actions">
-                <button id="btn-use-current-scope" type="button">Use Current Folder</button>
-                <button id="btn-use-suggested-alias" type="button">Use Suggested Alias</button>
-            </div>
-            <ul id="runtime-checks" class="status-list"></ul>
-        </div>
-
-        <div id="token-input-group">
-            <label>Telegram Bot Token:</label>
-            <input type="text" id="bot-token" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" required>
-            <p class="help-text">Get it from <a href="https://t.me/BotFather" target="_blank" style="color: var(--herd-brown); font-weight: bold; text-decoration: underline;">@BotFather</a> on Telegram → <code>/newbot</code></p>
-            <button id="btn-verify-token" type="button" style="margin-top: 10px;">Connect Bot</button>
-            <div id="token-error" style="color: red; margin-top: 5px; font-size: 0.9em;"></div>
-        </div>
-
-        <div id="group-pairing-section" class="hidden" style="margin-top: 20px; padding: 15px; border: 2px dashed var(--herd-brown); border-radius: var(--herd-radius); background: rgba(0,0,0,0.02);">
-            <h3 style="margin-top:0; color: var(--herd-brown);">Link your Telegram Group</h3>
-            <p style="margin-bottom: 5px;">1. Add your bot to the Telegram group you want to use.</p>
-            <p style="margin-bottom: 5px;">2. Send this exact message in the group:</p>
-            <div style="background: white; border: 1px solid var(--herd-input-border); padding: 10px; text-align: center; border-radius: 4px; font-size: 20px; font-family: monospace; letter-spacing: 2px; margin-bottom: 10px;">
-                <strong id="pin-display">/init 1234</strong>
-            </div>
-            <p id="pairing-status" style="color: #666; font-size: 0.9em; text-align: center;">⏳ Waiting for message in Telegram... (Timeout in 60s)</p>
-        </div>
-
-        <input type="hidden" id="group-id">
-        <div id="group-status-note" class="hidden" style="margin-top: 15px; padding: 12px 14px; background: #EEF6E6; border: 1px solid #CDE2B7; border-radius: var(--herd-radius); color: #47612C;"></div>
-
-        <div id="agent-config-section" class="hidden">
-            <div style="margin-top: 15px;">
-                <label>Agent Type:</label><br>
-                <div style="margin-top: 8px;">
-                    <strong style="font-size: 0.85em; color: var(--herd-brown);">CLI Agents</strong><br>
-                    <input type="radio" name="agent" value="claude-code" id="agent-claude" checked> <label for="agent-claude">Claude Code</label><br>
-                    <input type="radio" name="agent" value="gemini" id="agent-gemini"> <label for="agent-gemini">Gemini CLI</label><br>
-                    <input type="radio" name="agent" value="codex" id="agent-codex"> <label for="agent-codex">Codex</label>
+    <div class="app-shell stack">
+        <section class="hero-card">
+            <div class="hero-grid">
+                <div>
+                    <img src="/logo.png" alt="Herd Logo" class="logo">
+                    <span class="eyebrow">Guided Setup</span>
+                    <h1>Choose the right path before this instance changes anything</h1>
+                    <p class="hero-copy">
+                        Herd now separates joining, first-time owner setup, reconfiguring the current instance, and adding another active agent.
+                        The goal is simple: no more accidental overwrites and no more confusing "switch" flows that start by asking for an invite token.
+                    </p>
                 </div>
-                <div style="margin-top: 10px;">
-                    <strong style="font-size: 0.85em; color: var(--herd-brown);">VSCode-Based Agents</strong><br>
-                    <input type="radio" name="agent" value="vscode" id="agent-vscode"> <label for="agent-vscode">VSCode / Cursor / Antigravity</label>
-                    <div id="vscode-sub" class="hidden" style="margin-left: 24px; margin-top: 6px;">
-                        <select id="vscode-flavor" style="padding: 8px; border: 1px solid var(--herd-border); border-radius: var(--herd-radius); font-size: 14px; width: 100%;">
-                            <option value="cursor">Cursor</option>
-                            <option value="antigravity">Antigravity</option>
-                            <option value="vscode-generic">Other VSCode Extension</option>
-                        </select>
-                        <p class="help-text">Herd will write tasks to <code>.herd/tasks/pending.json</code>. Your VSCode agent picks them up automatically.</p>
+                <div class="panel" style="padding: 20px;">
+                    <div class="section-head" style="margin-bottom: 12px;">
+                        <h3>Setup Context</h3>
+                        <p class="section-copy">This area updates as Herd inspects the current machine and config.</p>
+                    </div>
+                    <div class="pill-row" id="context-pills">
+                        <span class="pill">Loading context...</span>
+                    </div>
+                    <div class="notice info" id="setup-context-note" style="margin-top: 14px;">
+                        Checking whether this is a fresh install, an invited join, or an existing instance.
                     </div>
                 </div>
-                <div style="margin-top: 10px;">
-                    <strong style="font-size: 0.85em; color: var(--herd-brown);">Other</strong><br>
-                    <input type="radio" name="agent" value="other" id="agent-other"> <label for="agent-other">Custom CLI command</label>
-                    <input type="text" id="agent-custom" placeholder="Custom command (e.g. my-agent --run)" style="display:none; margin-top: 5px;">
+            </div>
+            <div class="progress-row">
+                <div class="progress-step active" data-progress="1">
+                    <span class="progress-dot">1</span>
+                    <div class="progress-copy">
+                        <strong>Choose Flow</strong>
+                        <span>Pick join, owner, reconfigure, or add-agent guidance</span>
+                    </div>
+                </div>
+                <div class="progress-step" data-progress="2">
+                    <span class="progress-dot">2</span>
+                    <div class="progress-copy">
+                        <strong>Configure Instance</strong>
+                        <span>Bot, alias, agent type, workspace, and access rules</span>
+                    </div>
+                </div>
+                <div class="progress-step" data-progress="3">
+                    <span class="progress-dot">3</span>
+                    <div class="progress-copy">
+                        <strong>Review & Save</strong>
+                        <span>Confirm exactly what this instance will become</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="step-1" class="panel">
+            <div class="section-head">
+                <h2>Step 1: Choose The Flow</h2>
+                <p class="section-copy">
+                    Start by telling Herd what you actually want to do. This changes the rest of the setup so the form matches your intent instead of forcing a one-size-fits-all path.
+                </p>
+            </div>
+
+            <div class="flow-grid">
+                <button type="button" class="flow-card" id="card-join" data-flow="join">
+                    <div class="flow-top">
+                        <div class="flow-title">Join With Invite</div>
+                        <span class="tag">New Instance</span>
+                    </div>
+                    <p class="flow-text">Use an invite token to connect this machine as a new Herd instance inside an existing group.</p>
+                </button>
+
+                <button type="button" class="flow-card" id="card-bootstrap" data-flow="bootstrap">
+                    <div class="flow-top">
+                        <div class="flow-title">Create Owner Instance</div>
+                        <span class="tag recommended">First Run</span>
+                    </div>
+                    <p class="flow-text">Bootstrap the very first owner on a fresh Herd install. No invite token needed.</p>
+                </button>
+
+                <button type="button" class="flow-card" id="card-reconfigure" data-flow="reconfigure">
+                    <div class="flow-top">
+                        <div class="flow-title">Reconfigure This Instance</div>
+                        <span class="tag recommended">Safe Edit</span>
+                    </div>
+                    <p class="flow-text">Keep this current instance and update its bot, alias, workspace, or access settings.</p>
+                </button>
+
+                <button type="button" class="flow-card" id="card-add-agent" data-flow="add-agent">
+                    <div class="flow-top">
+                        <div class="flow-title">Add Another Active Agent</div>
+                        <span class="tag warning">Separate Process</span>
+                    </div>
+                    <p class="flow-text">Open the guided explanation for creating a second active agent without replacing the current one.</p>
+                </button>
+            </div>
+
+            <div id="panel-join" class="detail-panel hidden">
+                <div class="section-head">
+                    <h3>Join This Machine With An Invite Token</h3>
+                    <p class="section-copy">
+                        This path is for a new local instance joining an existing Herd group. Paste the invite token and Herd will preload the delegated role and scope.
+                    </p>
+                </div>
+                <div class="field-stack">
+                    <label for="token-input">Invite token</label>
+                    <input id="token-input" type="text" placeholder="herd-..." autocomplete="off">
+                    <p class="help-text">If the token is valid, Herd will automatically fill the delegated role, scope, and any suggested alias.</p>
+                </div>
+                <div id="token-feedback" class="feedback hidden" style="margin-top: 12px;"></div>
+                <div class="footer-actions" style="margin-top: 16px;">
+                    <button id="btn-flow-join" type="button" disabled>Continue With Invite</button>
                 </div>
             </div>
 
-            <div style="margin-top: 15px;">
-                <label>Agent Name in Group:</label>
-                <input type="text" id="alias" placeholder="agent_back" required>
-                <p class="help-text" id="alias-help">You can type something human-friendly. Herd will clean it up automatically before saving.</p>
+            <div id="panel-bootstrap" class="detail-panel hidden">
+                <div class="section-head">
+                    <h3>Create The First Owner Instance</h3>
+                    <p class="section-copy">
+                        Herd detected a fresh install. This flow prepares the owner instance for the group and skips invite-token onboarding.
+                    </p>
+                </div>
+                <div class="notice success">
+                    You are setting up the first local owner instance for this Herd installation. After connecting the bot, use Telegram `/init` to bind the owner account.
+                </div>
+                <div class="footer-actions" style="margin-top: 16px;">
+                    <button id="btn-flow-bootstrap" type="button">Continue As Owner</button>
+                </div>
             </div>
 
-            <div style="margin-top: 15px;">
-                <label>Project Folder:</label>
-                <input type="text" id="scope" placeholder="/home/user/my-project" required>
-                <p class="help-text" style="font-size: 0.8em; margin-top: 5px;">
-                    This is the root of the project your agent will work on. You can paste an absolute path, use something relative like <code>.</code>, or click <strong>Use Current Folder</strong> above.<br>
-                    • The <code>.herd/</code> folder will be created here (context, memory, tasks).<br>
-                    • The agent runs its commands from this directory.<br>
-                    • The agent will have access to all files inside this project.
+            <div id="panel-reconfigure" class="detail-panel hidden">
+                <div class="section-head">
+                    <h3>Reconfigure The Current Instance</h3>
+                    <p class="section-copy">
+                        This path edits the existing local instance in place. It keeps the "replace this instance" behavior explicit and no longer asks for an invite token first.
+                    </p>
+                </div>
+                <div class="summary-grid" id="reconfigure-summary">
+                    <div class="metric">
+                        <span class="metric-label">Current Agent</span>
+                        <span class="metric-value">Loading...</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Current Scope</span>
+                        <span class="metric-value">Loading...</span>
+                    </div>
+                </div>
+                <div class="footer-actions" style="margin-top: 16px;">
+                    <button id="btn-flow-reconfigure" type="button">Continue Reconfiguring</button>
+                </div>
+            </div>
+
+            <div id="panel-add-agent" class="detail-panel hidden">
+                <div class="section-head">
+                    <h3>Add Another Active Agent Without Replacing This One</h3>
+                    <p class="section-copy">
+                        A second active agent needs its own config path and its own running process. This guide keeps that separate from "reconfigure this instance" so the current agent is not overwritten by accident.
+                    </p>
+                </div>
+                <div class="notice warn">
+                    One Telegram account can own multiple aliases, but two agents online at the same time should run as separate Herd instances. In practice, that usually means a separate bot token per active agent instance.
+                </div>
+                <div class="card-grid" style="margin-top: 16px;">
+                    <div class="info-card" style="padding: 18px;">
+                        <div class="field-stack">
+                            <label for="new-config-name">Suggested config file for the new agent</label>
+                            <input id="new-config-name" type="text" value="config.second-agent.json" autocomplete="off">
+                            <p class="help-text">Use any name you want. Herd will keep this current instance untouched and point the new one to its own config path.</p>
+                        </div>
+                        <div class="field-stack" style="margin-top: 14px;">
+                            <label for="new-env-name">Suggested env file for the new agent</label>
+                            <input id="new-env-name" type="text" value=".env.second-agent" autocomplete="off">
+                            <p class="help-text">Use a separate env file too, so the new setup does not inherit the current agent alias, scope, bot token, and Telegram settings from the first instance.</p>
+                        </div>
+                        <div class="notice info" style="margin-top: 14px;">
+                            Herd cannot start a second local process directly from this browser page. The commands below are only copied, not executed.
+                        </div>
+                        <div class="summary-grid" style="margin-top: 14px;">
+                            <div class="metric">
+                                <span class="metric-label">Where to run it</span>
+                                <span class="metric-value" id="add-agent-working-dir">Loading...</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">What stays untouched</span>
+                                <span class="metric-value">Your current <code>config.json</code> and current running agent</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">What will be separate</span>
+                                <span class="metric-value"><code id="add-agent-config-path">Loading...</code><br><code id="add-agent-env-path">Loading...</code></span>
+                            </div>
+                        </div>
+                        <div class="code-block" id="add-agent-setup-command"></div>
+                        <div class="status-list" style="margin-top: 14px;">
+                            <div class="status-item ok">1. Open a new terminal window or tab.</div>
+                            <div class="status-item ok">2. Go to the Herd folder shown above.</div>
+                            <div class="status-item ok">3. Run the setup command below to create the second config file and second env file.</div>
+                        </div>
+                        <div class="inline-actions">
+                            <button type="button" class="btn-secondary" id="copy-setup-command">Copy Setup Command</button>
+                        </div>
+                    </div>
+                    <div class="info-card" style="padding: 18px;">
+                        <div class="section-head" style="margin-bottom: 10px;">
+                            <h3>Start The New Agent Later</h3>
+                            <p class="section-copy">After the new setup is saved, use the same config path to launch that second instance.</p>
+                        </div>
+                        <div class="code-block" id="add-agent-start-command"></div>
+                        <div class="status-list" style="margin-top: 14px;">
+                            <div class="status-item">4. Finish the new setup in the browser window opened by that command.</div>
+                            <div class="status-item">5. In another terminal, run the start command below when you want the second agent online.</div>
+                        </div>
+                        <div class="inline-actions">
+                            <button type="button" class="btn-secondary" id="copy-start-command">Copy Start Command</button>
+                            <button type="button" class="btn-ghost" id="replace-instead-button">Replace This Instance Instead</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="add-agent-feedback" class="flash hidden" style="margin-top: 14px;"></div>
+            </div>
+        </section>
+
+        <section id="step-2" class="panel hidden">
+            <div class="section-head">
+                <h2>Step 2: Configure This Instance</h2>
+                <p class="section-copy" id="step-2-copy">
+                    Fill in the connection and agent settings for this Herd instance.
                 </p>
             </div>
-        </div>
 
-        <div id="storage-options" class="hidden" style="margin-top: 20px; padding: 14px 16px; border: 1px solid var(--herd-input-border); border-radius: var(--herd-radius); background: rgba(0,0,0,0.02);">
-            <label style="display: flex; gap: 10px; align-items: flex-start;">
-                <input type="checkbox" id="sync-env" checked style="margin-top: 3px;">
-                <span>
-                    <strong>Keep CLI settings synced in <code>.env</code></strong><br>
-                    <span class="help-text">Recommended. The UI will update <code>config.json</code> and <code>.env</code> together so terminal commands and dashboard stay aligned.</span>
-                </span>
-            </label>
-            <p id="storage-targets" class="help-text" style="margin-top: 10px;"></p>
-        </div>
+            <div class="pill-row" id="selected-flow-pills"></div>
 
-        <div id="step-2-actions" class="hidden" style="margin-top: 20px;">
-            <button id="btn-back-1">← Back</button>
-            <button id="btn-step2">Continue →</button>
-        </div>
-    </section>
+            <div class="split-grid" style="margin-top: 18px;">
+                <div class="stack">
+                    <div class="info-card" style="padding: 18px;">
+                        <div class="section-head" style="margin-bottom: 12px;">
+                            <h3>Telegram Connection</h3>
+                            <p class="section-copy">
+                                Connect a bot to the target Telegram group. If this instance is already configured, you can keep the stored bot and group or reconnect them.
+                            </p>
+                        </div>
+                        <div class="field-stack">
+                            <label for="bot-token">Telegram Bot Token</label>
+                            <input type="text" id="bot-token" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" autocomplete="off">
+                            <p class="help-text">Get it from <a href="https://t.me/BotFather" target="_blank" class="helper-link">@BotFather</a> with <code>/newbot</code>.</p>
+                        </div>
+                        <div class="inline-actions">
+                            <button id="btn-verify-token" type="button">Connect Bot</button>
+                        </div>
+                        <div id="token-error" class="feedback hidden" style="margin-top: 12px;"></div>
+                        <div id="group-status-note" class="notice info hidden" style="margin-top: 14px;"></div>
 
-    <!-- STEP 3: Confirmation -->
-    <section id="step-3" class="step-panel hidden">
-        <h2>Confirmation</h2>
-        <div id="summary"></div>
-        <div id="will-create" style="margin-top: 15px; font-size: 0.9em; color: #666;">
-            This will create a <code>config.json</code> and initialize a <code>.herd/</code> directory in your project's root.
-        </div>
-        <div style="margin-top: 20px;">
-            <button id="btn-back-2">← Back</button>
-            <button id="btn-start">🐄 Start Herd</button>
-        </div>
-    </section>
+                        <div id="group-pairing-section" class="detail-panel hidden" style="margin-top: 14px;">
+                            <div class="section-head">
+                                <h3>Link The Telegram Group</h3>
+                                <p class="section-copy">Add the bot to the group, then send the exact command below in that group chat.</p>
+                            </div>
+                            <div class="code-block"><strong id="pin-display">/init 1234</strong></div>
+                            <p id="pairing-status" class="helper" style="margin-top: 12px;">Waiting for message in Telegram...</p>
+                        </div>
+                        <input type="hidden" id="group-id">
+                    </div>
 
-        <script>
-            let isBootstrap = false;
-            let currentConfigMeta = null;
-            let lastVerifiedToken = null;
-            let hasStoredBotToken = false;
+                    <div class="info-card" style="padding: 18px;">
+                        <div class="section-head" style="margin-bottom: 12px;">
+                            <h3>Agent Identity</h3>
+                            <p class="section-copy">Choose how this instance will appear and where it will work.</p>
+                        </div>
+                        <div class="field-stack">
+                            <label>Agent Type</label>
+                            <div class="card-grid">
+                                <label class="choice-row mini-card" style="padding: 14px;">
+                                    <input type="radio" name="agent" value="claude-code" id="agent-claude" checked>
+                                    <span class="choice-copy">
+                                        <strong>Claude Code</strong>
+                                        <span>CLI mode</span>
+                                    </span>
+                                </label>
+                                <label class="choice-row mini-card" style="padding: 14px;">
+                                    <input type="radio" name="agent" value="gemini" id="agent-gemini">
+                                    <span class="choice-copy">
+                                        <strong>Gemini CLI</strong>
+                                        <span>CLI mode</span>
+                                    </span>
+                                </label>
+                                <label class="choice-row mini-card" style="padding: 14px;">
+                                    <input type="radio" name="agent" value="codex" id="agent-codex">
+                                    <span class="choice-copy">
+                                        <strong>Codex</strong>
+                                        <span>CLI mode</span>
+                                    </span>
+                                </label>
+                                <label class="choice-row mini-card" style="padding: 14px;">
+                                    <input type="radio" name="agent" value="vscode" id="agent-vscode">
+                                    <span class="choice-copy">
+                                        <strong>VSCode-Based Agent</strong>
+                                        <span>Cursor, Antigravity, or another watcher</span>
+                                    </span>
+                                </label>
+                                <label class="choice-row mini-card" style="padding: 14px;">
+                                    <input type="radio" name="agent" value="other" id="agent-other">
+                                    <span class="choice-copy">
+                                        <strong>Custom CLI</strong>
+                                        <span>Provide your own command</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                        <div id="vscode-sub" class="field-stack hidden" style="margin-top: 14px;">
+                            <label for="vscode-flavor">VSCode flavor</label>
+                            <select id="vscode-flavor">
+                                <option value="cursor">Cursor</option>
+                                <option value="antigravity">Antigravity</option>
+                                <option value="vscode-generic">Other VSCode Extension</option>
+                            </select>
+                            <p class="help-text">Herd writes tasks to <code>.herd/tasks/pending.json</code> and your editor-side agent picks them up.</p>
+                        </div>
+                        <div id="custom-command-wrap" class="field-stack hidden" style="margin-top: 14px;">
+                            <label for="agent-custom">Custom command</label>
+                            <input type="text" id="agent-custom" placeholder="my-agent --run">
+                        </div>
+                        <div class="field-stack" style="margin-top: 14px;">
+                            <label for="alias">Agent name in Telegram</label>
+                            <input type="text" id="alias" placeholder="agent_back" autocomplete="off">
+                            <p class="help-text" id="alias-help">You can type something human-friendly. Herd will clean it up automatically before saving.</p>
+                        </div>
+                        <div class="field-stack" style="margin-top: 14px;">
+                            <label for="scope">Project folder</label>
+                            <input type="text" id="scope" placeholder="/home/user/my-project" autocomplete="off">
+                            <p class="help-text">
+                                This is the root of the project this instance will work on. Herd stores local context in <code>.herd/</code> inside this directory.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stack">
+                    <div id="machine-hints" class="info-card hidden" style="padding: 18px;">
+                        <div class="section-head" style="margin-bottom: 12px;">
+                            <h3>Quick Fill For This Machine</h3>
+                            <p class="section-copy" id="machine-summary"></p>
+                        </div>
+                        <p id="detected-agents" class="helper"></p>
+                        <div class="inline-actions">
+                            <button id="btn-use-current-scope" type="button" class="btn-secondary">Use Current Folder</button>
+                            <button id="btn-use-suggested-alias" type="button" class="btn-secondary">Use Suggested Alias</button>
+                        </div>
+                        <ul id="runtime-checks" class="status-list" style="margin-top: 14px;"></ul>
+                    </div>
+
+                    <div class="info-card" style="padding: 18px;">
+                        <div class="section-head" style="margin-bottom: 12px;">
+                            <h3>Project Access</h3>
+                            <p class="section-copy">Decide whether this instance is allowed to change the project or only generate reports.</p>
+                        </div>
+                        <label class="choice-row">
+                            <input type="checkbox" id="allow-project-changes" checked style="margin-top: 3px;">
+                            <span class="choice-copy">
+                                <strong>Allow this agent to change project files</strong>
+                                <span>If disabled, Herd switches to report-only mode and saves Markdown reports in <code>.herd/outputs/reports</code>.</span>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div class="info-card" style="padding: 18px;">
+                        <div class="section-head" style="margin-bottom: 12px;">
+                            <h3>Config Storage</h3>
+                            <p class="section-copy">Keep terminal commands and the dashboard aligned by syncing non-secret settings to `.env`.</p>
+                        </div>
+                        <label class="choice-row">
+                            <input type="checkbox" id="sync-env" checked style="margin-top: 3px;">
+                            <span class="choice-copy">
+                                <strong>Keep CLI settings synced in `.env`</strong>
+                                <span>Recommended. The bot token still stays only in `.env`.</span>
+                            </span>
+                        </label>
+                        <div id="storage-targets" class="notice info" style="margin-top: 14px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-actions" style="margin-top: 18px;">
+                <button id="btn-back-1" type="button" class="btn-secondary">Back To Flow Choice</button>
+                <button id="btn-step2" type="button">Review This Instance</button>
+            </div>
+        </section>
+
+        <section id="step-3" class="panel hidden">
+            <div class="section-head">
+                <h2>Step 3: Review & Save</h2>
+                <p class="section-copy" id="review-copy">
+                    Confirm the exact outcome before this instance is saved.
+                </p>
+            </div>
+            <div id="summary" class="summary-grid"></div>
+            <div id="will-create" class="notice info" style="margin-top: 16px;"></div>
+            <div class="footer-actions" style="margin-top: 18px;">
+                <button id="btn-back-2" type="button" class="btn-secondary">Back To Configuration</button>
+                <button id="btn-start" type="button">Save This Instance</button>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const state = {
+            isFirstRun: false,
+            currentConfigMeta: null,
+            hasStoredBotToken: false,
+            lastVerifiedToken: null,
+            tokenData: null,
+            pairedTelegramIdentity: null,
+            selectedFlow: null,
+            setupData: null,
+            requestedFlow: new URLSearchParams(window.location.search).get('flow') || ''
+        }
 
         function normalizeAlias(value) {
             return (value || '')
@@ -181,435 +425,774 @@
                 .replace(/[\s-]+/g, '_')
                 .replace(/[^a-z0-9_]/g, '')
                 .replace(/_+/g, '_')
-                .replace(/^_+|_+$/g, '');
+                .replace(/^_+|_+$/g, '')
         }
 
-        function unlockConfiguration() {
-            document.getElementById('agent-config-section').classList.remove('hidden');
-            document.getElementById('storage-options').classList.remove('hidden');
-            document.getElementById('step-2-actions').classList.remove('hidden');
+        function escapeHtml(unsafe) {
+            return (unsafe || '').toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;")
         }
 
-            function updateStoragePreview() {
-                const syncEnv = document.getElementById('sync-env').checked;
-                const configPath = currentConfigMeta?.config_path || 'config.json';
-                const envPath = currentConfigMeta?.env_path || '.env';
-                const storageTargets = document.getElementById('storage-targets');
-                const willCreate = document.getElementById('will-create');
+        function quoteShell(value) {
+            if (!value) return "''"
+            if (!/[\s"'$]/.test(value)) return value
+            return `"${value.replace(/(["\\$`])/g, '\\$1')}"`
+        }
 
-                if (syncEnv) {
-                    storageTargets.innerHTML = `The UI will keep non-secret settings in <code>${configPath}</code> and <code>${envPath}</code> in sync. The bot token stays only in <code>${envPath}</code>.`;
-                    willCreate.innerHTML = 'This will update <code>config.json</code>, keep the bot token in <code>.env</code>, sync the remaining CLI settings, and initialize a <code>.herd/</code> directory in your project root.';
-                } else {
-                    storageTargets.innerHTML = `The UI will update <code>${configPath}</code>. The bot token still stays only in <code>${envPath}</code>.`;
-                    willCreate.innerHTML = 'This will update <code>config.json</code>, keep the bot token in <code>.env</code>, and initialize a <code>.herd/</code> directory in your project root.';
-                }
+        function pathDirectory(path) {
+            const normalized = (path || '').replace(/\\/g, '/')
+            const idx = normalized.lastIndexOf('/')
+            if (idx < 0) return ''
+            return normalized.slice(0, idx + 1)
+        }
+
+        function fileStem(name) {
+            const normalized = (name || '').trim().replace(/^.*[\\/]/, '')
+            if (!normalized) return 'second-agent'
+            const dotIndex = normalized.lastIndexOf('.')
+            return dotIndex > 0 ? normalized.slice(0, dotIndex) : normalized
+        }
+
+        function suggestedEnvNameFromConfig(configName) {
+            const stem = fileStem(configName)
+                .replace(/^config[._-]?/i, '')
+                .replace(/^[._-]+/, '')
+
+            return stem ? `.env.${stem}` : '.env.second-agent'
+        }
+
+        function hasCompleteConfig() {
+            return Boolean(state.currentConfigMeta?.config_complete)
+        }
+
+        function availableFlows() {
+            return {
+                join: !state.isFirstRun && !hasCompleteConfig(),
+                bootstrap: state.isFirstRun,
+                reconfigure: hasCompleteConfig(),
+                'add-agent': hasCompleteConfig()
+            }
+        }
+
+        function flowLabel(flow) {
+            return {
+                join: 'Join With Invite',
+                bootstrap: 'Create Owner Instance',
+                reconfigure: 'Reconfigure This Instance',
+                'add-agent': 'Add Another Active Agent'
+            }[flow] || 'Setup'
+        }
+
+        function flowSummary(flow) {
+            return {
+                join: 'This machine will join an existing Herd using an invite token.',
+                bootstrap: 'This machine will become the first owner instance for the Herd install.',
+                reconfigure: 'You are editing the current instance in place.',
+                'add-agent': 'You are viewing the guided path for a second active agent.'
+            }[flow] || ''
+        }
+
+        function flowStep2Copy(flow) {
+            return {
+                join: 'Configure the new instance that will join an existing Herd group.',
+                bootstrap: 'Connect the owner bot and finish the first local owner instance.',
+                reconfigure: 'Edit the current instance safely. Invite tokens are not required for this path.',
+                'add-agent': 'A second active agent should use a separate config path. Use the guide above or switch to reconfigure if you intend to replace this instance.'
+            }[flow] || 'Fill in the connection and agent settings for this Herd instance.'
+        }
+
+        function flowSaveLabel(flow) {
+            return {
+                join: 'Save Joined Instance',
+                bootstrap: 'Create Owner Instance',
+                reconfigure: 'Save This Instance'
+            }[flow] || 'Save This Instance'
+        }
+
+        function updateProgress(step) {
+            document.querySelectorAll('[data-progress]').forEach(el => {
+                const index = parseInt(el.dataset.progress, 10)
+                el.classList.toggle('active', index === step)
+                el.classList.toggle('done', index < step)
+            })
+        }
+
+        function goToStep(step) {
+            document.getElementById('step-1').classList.toggle('hidden', step !== 1)
+            document.getElementById('step-2').classList.toggle('hidden', step !== 2)
+            document.getElementById('step-3').classList.toggle('hidden', step !== 3)
+            updateProgress(step)
+        }
+
+        function renderContextPills() {
+            const pills = []
+            if (state.isFirstRun) {
+                pills.push('<span class="pill success">Fresh install detected</span>')
+            } else {
+                pills.push('<span class="pill">Existing Herd install detected</span>')
             }
 
+            if (hasCompleteConfig()) {
+                pills.push('<span class="pill success">Current instance configured</span>')
+            } else {
+                pills.push('<span class="pill warn">No active instance configured yet</span>')
+            }
+
+            if (state.hasStoredBotToken) {
+                pills.push('<span class="pill success">Bot token already stored locally</span>')
+            }
+
+            document.getElementById('context-pills').innerHTML = pills.join('')
+
+            let note = 'Choose a flow to begin.'
+            if (state.requestedFlow === 'reconfigure' && hasCompleteConfig()) {
+                note = 'You came from the dashboard to reconfigure the current instance, so Herd will open the edit path directly.'
+            } else if (state.requestedFlow === 'add-agent' && hasCompleteConfig()) {
+                note = 'You came from the dashboard to add another active agent, so Herd is showing the separate-instance guide first.'
+            } else if (state.isFirstRun) {
+                note = 'Fresh install detected. The owner setup path is ready.'
+            } else if (hasCompleteConfig()) {
+                note = 'A configured instance already exists here. Reconfigure it safely or open the add-agent guide for a second active instance.'
+            } else {
+                note = 'No complete instance is configured yet. Joining with an invite is the normal path.'
+            }
+
+            document.getElementById('setup-context-note').textContent = note
+        }
+
+        function renderFlowCards() {
+            const availability = availableFlows()
+            Object.entries(availability).forEach(([flow, visible]) => {
+                const card = document.getElementById(`card-${flow}`)
+                const panel = document.getElementById(`panel-${flow}`)
+                if (card) card.classList.toggle('hidden', !visible)
+                if (panel) panel.classList.toggle('hidden', true)
+            })
+        }
+
+        function selectFlow(flow) {
+            state.selectedFlow = flow
+            document.querySelectorAll('.flow-card').forEach(card => {
+                card.classList.toggle('active', card.dataset.flow === flow)
+            })
+            document.querySelectorAll('#step-1 .detail-panel').forEach(panel => {
+                panel.classList.add('hidden')
+            })
+            const panel = document.getElementById(`panel-${flow}`)
+            if (panel) panel.classList.remove('hidden')
+
+            document.getElementById('step-2-copy').textContent = flowStep2Copy(flow)
+            document.getElementById('selected-flow-pills').innerHTML = `
+                <span class="pill success">${escapeHtml(flowLabel(flow))}</span>
+                <span class="pill">${escapeHtml(flowSummary(flow))}</span>
+            `
+            document.getElementById('review-copy').textContent = flowSummary(flow)
+            document.getElementById('btn-start').textContent = flowSaveLabel(flow)
+        }
+
+        function updateAliasHelp() {
+            const aliasInput = document.getElementById('alias')
+            const aliasHelp = document.getElementById('alias-help')
+            const raw = aliasInput.value.trim()
+            const normalized = normalizeAlias(raw)
+
+            if (!raw) {
+                aliasHelp.textContent = 'You can type something human-friendly. Herd will clean it up automatically before saving.'
+                return
+            }
+
+            if (normalized.length < 3) {
+                aliasHelp.textContent = 'Use at least 3 letters or numbers so Herd can generate a stable @alias.'
+                return
+            }
+
+            if (normalized !== raw.replace(/^@+/, '')) {
+                aliasHelp.innerHTML = `Herd will save this as <code>@${normalized}</code>.`
+                return
+            }
+
+            aliasHelp.innerHTML = `This will appear in Telegram as <code>@${normalized}</code>.`
+        }
+
+        function renderMachineHints(diagnostics = {}) {
+            const card = document.getElementById('machine-hints')
+            const summary = document.getElementById('machine-summary')
+            const detectedAgents = document.getElementById('detected-agents')
+            const checks = document.getElementById('runtime-checks')
+
+            if (!diagnostics || !diagnostics.defaults) {
+                card.classList.add('hidden')
+                return
+            }
+
+            summary.innerHTML = `Current folder: <code>${escapeHtml(diagnostics.defaults.scope)}</code><br>Suggested alias: <code>@${escapeHtml(diagnostics.defaults.alias)}</code>`
+
+            if (diagnostics.detected_agent_labels && diagnostics.detected_agent_labels.length) {
+                detectedAgents.innerHTML = `Detected CLI agent(s): <strong>${escapeHtml(diagnostics.detected_agent_labels.join(', '))}</strong>.`
+            } else {
+                detectedAgents.textContent = 'No supported CLI agent was auto-detected. You can still use VSCode watcher mode or a custom CLI command.'
+            }
+
+            const packageOk = diagnostics.required_packages_ready
+            const packageText = packageOk
+                ? 'Herd runtime dependencies are ready on this machine.'
+                : `Missing Python packages: ${diagnostics.missing_required_packages.join(', ')}`
+
+            const recommendedAgent = diagnostics.agents?.find(agent => agent.type === diagnostics.recommended_agent)
+            const recommendedAgentText = diagnostics.detected_agent_labels?.length
+                ? `Recommended agent for this machine: ${recommendedAgent?.label || diagnostics.recommended_agent}.`
+                : 'Pick the agent you want Herd to talk to.'
+
+            checks.innerHTML = `
+                <li class="status-item ok">Python ${escapeHtml(diagnostics.python?.version || 'ready')} is available for Herd.</li>
+                <li class="status-item ${packageOk ? 'ok' : 'warn'}">${escapeHtml(packageText)}</li>
+                <li class="status-item ok">${escapeHtml(recommendedAgentText)}</li>
+            `
+
+            card.classList.remove('hidden')
+        }
+
         function applyAgentPrefill(agentConfig = {}) {
-            const type = agentConfig.type;
-            if (!type) return;
+            const type = agentConfig.type
+            if (!type) return
 
             const cliMap = {
                 'claude-code': 'agent-claude',
                 'gemini': 'agent-gemini',
-                'codex': 'agent-codex',
-            };
+                'codex': 'agent-codex'
+            }
 
             if (cliMap[type]) {
-                document.getElementById(cliMap[type]).checked = true;
-                document.getElementById('agent-custom').style.display = 'none';
-                document.getElementById('vscode-sub').style.display = 'none';
-                return;
+                document.getElementById(cliMap[type]).checked = true
+                toggleAgentExtras('cli')
+                return
             }
 
             if (['cursor', 'antigravity', 'vscode-generic'].includes(type)) {
-                document.getElementById('agent-vscode').checked = true;
-                document.getElementById('vscode-sub').style.display = 'block';
-                document.getElementById('agent-custom').style.display = 'none';
-                document.getElementById('vscode-flavor').value = type;
-                return;
+                document.getElementById('agent-vscode').checked = true
+                document.getElementById('vscode-flavor').value = type
+                toggleAgentExtras('vscode')
+                return
             }
 
-            document.getElementById('agent-other').checked = true;
-            document.getElementById('agent-custom').style.display = 'block';
-            document.getElementById('vscode-sub').style.display = 'none';
+            document.getElementById('agent-other').checked = true
             document.getElementById('agent-custom').value = [agentConfig.command || '', ...(agentConfig.args || [])]
                 .filter(Boolean)
-                .join(' ');
+                .join(' ')
+            toggleAgentExtras('other')
         }
 
-            function updateAliasHelp() {
-                const aliasInput = document.getElementById('alias');
-                const aliasHelp = document.getElementById('alias-help');
-                const raw = aliasInput.value.trim();
-                const normalized = normalizeAlias(raw);
-
-                if (!raw) {
-                    aliasHelp.textContent = 'You can type something human-friendly. Herd will clean it up automatically before saving.';
-                    return;
-                }
-
-                if (normalized.length < 3) {
-                    aliasHelp.textContent = 'Use at least 3 letters or numbers so Herd can generate a stable @alias.';
-                    return;
-                }
-
-                if (normalized !== raw.replace(/^@+/, '')) {
-                    aliasHelp.innerHTML = `Herd will save this as <code>@${normalized}</code>.`;
-                    return;
-                }
-
-                aliasHelp.innerHTML = `This will appear in Telegram as <code>@${normalized}</code>.`;
-            }
-
-            function renderMachineHints(diagnostics = {}) {
-                const card = document.getElementById('machine-hints');
-                const summary = document.getElementById('machine-summary');
-                const detectedAgents = document.getElementById('detected-agents');
-                const checks = document.getElementById('runtime-checks');
-
-                if (!diagnostics || !diagnostics.defaults) {
-                    card.classList.add('hidden');
-                    return;
-                }
-
-                summary.innerHTML = `Current folder: <code>${diagnostics.defaults.scope}</code><br>Suggested alias: <code>@${diagnostics.defaults.alias}</code>`;
-
-                if (diagnostics.detected_agent_labels && diagnostics.detected_agent_labels.length) {
-                    detectedAgents.innerHTML = `Detected CLI agent(s): <strong>${diagnostics.detected_agent_labels.join(', ')}</strong>. Herd preselects the first one it found.`;
-                } else {
-                    detectedAgents.innerHTML = 'No supported CLI agent was auto-detected. You can still use VSCode watcher mode or a custom CLI command.';
-                }
-
-                const packageOk = diagnostics.required_packages_ready;
-                const packageText = packageOk
-                    ? 'Herd runtime dependencies are ready on this machine.'
-                    : `Missing Python packages: ${diagnostics.missing_required_packages.join(', ')}`;
-                const recommendedAgent = diagnostics.agents?.find(agent => agent.type === diagnostics.recommended_agent);
-                const recommendedAgentText = diagnostics.detected_agent_labels?.length
-                    ? `Recommended agent for this machine: ${recommendedAgent?.label || diagnostics.recommended_agent}.`
-                    : 'Pick the agent you want Herd to talk to.';
-
-                checks.innerHTML = `
-                    <li class="status-item ok">Python ${diagnostics.python?.version || 'ready'} is available for Herd.</li>
-                    <li class="status-item ${packageOk ? 'ok' : 'warn'}">${packageText}</li>
-                    <li class="status-item ok">${recommendedAgentText}</li>
-                `;
-
-                card.classList.remove('hidden');
-            }
-
-            function applyCurrentConfig(data) {
-                currentConfigMeta = data;
-                hasStoredBotToken = Boolean(data.has_bot_token);
-
-                if (data.sources && data.sources.length) {
-                    const sourceLabel = data.sources.join(' + ');
-                    const banner = document.getElementById('config-banner');
-                    banner.innerHTML = `Loaded existing settings from <strong>${sourceLabel}</strong>. You can adjust them here and keep CLI + UI aligned.`;
-                banner.classList.remove('hidden');
-            }
-
-                const config = data.config || {};
-                const diagnostics = data.diagnostics || {};
-                renderMachineHints(diagnostics);
-
-                if (hasStoredBotToken) {
-                    document.getElementById('bot-token').placeholder = 'Stored securely in .env';
-                }
-                if (config.telegram_group_id) document.getElementById('group-id').value = config.telegram_group_id;
-                if (config.alias) {
-                    document.getElementById('alias').value = config.alias;
-                } else if (diagnostics.defaults?.alias) {
-                    document.getElementById('alias').value = diagnostics.defaults.alias;
-                }
-                if (config.scope) {
-                    document.getElementById('scope').value = config.scope;
-                } else if (diagnostics.defaults?.scope) {
-                    document.getElementById('scope').value = diagnostics.defaults.scope;
-                }
-
-                if (config.agent && config.agent.type) {
-                    applyAgentPrefill(config.agent || {});
-                } else if (diagnostics.recommended_agent) {
-                    applyAgentPrefill({ type: diagnostics.recommended_agent });
-                }
-
-                if (hasStoredBotToken && config.telegram_group_id) {
-                    const note = document.getElementById('group-status-note');
-                    note.innerHTML = `✅ Telegram group already linked (ID: ${config.telegram_group_id}). The bot token stays stored locally in <code>.env</code>. Reconnect only if you want to change it.`;
-                    note.classList.remove('hidden');
-                    unlockConfiguration();
-                    document.getElementById('btn-verify-token').disabled = false;
-                    document.getElementById('btn-verify-token').textContent = 'Reconnect Bot';
-                }
-
-            updateAliasHelp();
-            updateStoragePreview();
+        function toggleAgentExtras(mode) {
+            document.getElementById('vscode-sub').classList.toggle('hidden', mode !== 'vscode')
+            document.getElementById('custom-command-wrap').classList.toggle('hidden', mode !== 'other')
         }
 
-        // --- AUTO-DETECT FIRST RUN ---
-        (async function checkFirstRun() {
-            try {
-                const res = await fetch('/api/check-first-run');
-                const data = await res.json();
-                isBootstrap = data.first_run;
-            } catch (e) {
-                isBootstrap = true; // If API fails, assume first run
-            }
+        function updateStoragePreview() {
+            const syncEnv = document.getElementById('sync-env').checked
+            const allowProjectChanges = document.getElementById('allow-project-changes').checked
+            const configPath = state.currentConfigMeta?.config_path || 'config.json'
+            const envPath = state.currentConfigMeta?.env_path || '.env'
+            const storageTargets = document.getElementById('storage-targets')
+            const willCreate = document.getElementById('will-create')
+            const accessText = allowProjectChanges
+                ? 'Project changes stay enabled for this agent.'
+                : 'Project changes stay disabled and Herd saves Markdown reports in <code>.herd/outputs/reports</code>.'
 
-            document.getElementById('loading-check').classList.add('hidden');
-
-            if (isBootstrap) {
-                document.getElementById('bootstrap-section').classList.remove('hidden');
+            if (syncEnv) {
+                storageTargets.innerHTML = `The UI will keep non-secret settings in <code>${escapeHtml(configPath)}</code> and <code>${escapeHtml(envPath)}</code> in sync. The bot token stays only in <code>${escapeHtml(envPath)}</code>. ${accessText}`
+                willCreate.innerHTML = 'This will update the current instance config, keep the bot token in <code>.env</code>, sync the remaining CLI settings when requested, and initialize or refresh <code>.herd/</code> in the selected project.'
             } else {
-                document.getElementById('token-section').classList.remove('hidden');
+                storageTargets.innerHTML = `The UI will update <code>${escapeHtml(configPath)}</code>. The bot token still stays only in <code>${escapeHtml(envPath)}</code>. ${accessText}`
+                willCreate.innerHTML = 'This will update the current instance config, keep the bot token in <code>.env</code>, and initialize or refresh <code>.herd/</code> in the selected project.'
             }
-        })();
+        }
 
-        (async function loadCurrentConfig() {
-            try {
-                const res = await fetch('/api/current-config');
-                const data = await res.json();
-                applyCurrentConfig(data);
-            } catch (e) {
-                updateStoragePreview();
+        function updateReconfigureSummary(config = {}) {
+            const alias = config.alias ? `@${config.alias}` : 'Not configured'
+            const scope = config.scope || 'Not configured'
+            document.getElementById('reconfigure-summary').innerHTML = `
+                <div class="metric">
+                    <span class="metric-label">Current Agent</span>
+                    <span class="metric-value">${escapeHtml(alias)}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Current Scope</span>
+                    <span class="metric-value">${escapeHtml(scope)}</span>
+                </div>
+            `
+        }
+
+        function updateAddAgentCommands() {
+            const configName = document.getElementById('new-config-name').value.trim() || 'config.second-agent.json'
+            const envName = document.getElementById('new-env-name').value.trim() || suggestedEnvNameFromConfig(configName)
+            const configDir = pathDirectory(state.currentConfigMeta?.config_path || '')
+            const configPath = `${configDir}${configName}`
+            const envPath = `${configDir}${envName}`
+            const setupCommand = `ENV_PATH=${quoteShell(envPath)} CONFIG_PATH=${quoteShell(configPath)} ./start.sh setup`
+            const startCommand = `ENV_PATH=${quoteShell(envPath)} CONFIG_PATH=${quoteShell(configPath)} ./start.sh`
+            const workingDir = pathDirectory(state.currentConfigMeta?.config_path || '') || window.location.pathname
+
+            document.getElementById('add-agent-setup-command').textContent = setupCommand
+            document.getElementById('add-agent-start-command').textContent = startCommand
+            document.getElementById('add-agent-working-dir').textContent = workingDir
+            document.getElementById('add-agent-config-path').textContent = configPath
+            document.getElementById('add-agent-env-path').textContent = envPath
+        }
+
+        function renderConnectionNote(config = {}) {
+            const note = document.getElementById('group-status-note')
+            const hasGroup = Boolean(config.telegram_group_id)
+
+            if (state.hasStoredBotToken && hasGroup) {
+                note.innerHTML = `Current group already linked (ID: ${escapeHtml(config.telegram_group_id)}). Leave the token field empty to keep the stored bot for this instance, or connect another one below.`
+                note.className = 'notice success'
+                note.classList.remove('hidden')
+                document.getElementById('group-id').value = config.telegram_group_id
+                document.getElementById('btn-verify-token').textContent = 'Reconnect Bot'
+            } else {
+                note.classList.add('hidden')
+                document.getElementById('btn-verify-token').textContent = 'Connect Bot'
             }
-        })();
+        }
 
-        // --- AGENT RADIO TOGGLE ---
-        const botTokenInput = document.getElementById('bot-token');
-        const aliasInput = document.getElementById('alias');
-        document.querySelectorAll('input[name="agent"]').forEach(el => {
-            el.addEventListener('change', e => {
-                document.getElementById('agent-custom').style.display = e.target.value === 'other' ? 'block' : 'none';
-                document.getElementById('vscode-sub').style.display = e.target.value === 'vscode' ? 'block' : 'none';
-            });
-        });
-        document.getElementById('sync-env').addEventListener('change', updateStoragePreview);
-        aliasInput.addEventListener('input', updateAliasHelp);
-        document.getElementById('btn-use-current-scope').addEventListener('click', () => {
-            const suggestedScope = currentConfigMeta?.diagnostics?.defaults?.scope;
-            if (!suggestedScope) return;
-            document.getElementById('scope').value = suggestedScope;
-        });
-        document.getElementById('btn-use-suggested-alias').addEventListener('click', () => {
-            const suggestedAlias = currentConfigMeta?.diagnostics?.defaults?.alias;
-            if (!suggestedAlias) return;
-            aliasInput.value = suggestedAlias;
-            updateAliasHelp();
-        });
-        botTokenInput.addEventListener('input', () => {
-            const typedToken = botTokenInput.value.trim();
-            if (!typedToken) {
-                if (lastVerifiedToken) {
-                    lastVerifiedToken = null;
+        function applyCurrentConfig(data) {
+            state.currentConfigMeta = data
+            state.hasStoredBotToken = Boolean(data.has_bot_token)
+
+            const config = data.config || {}
+            const diagnostics = data.diagnostics || {}
+
+            renderMachineHints(diagnostics)
+            renderConnectionNote(config)
+            updateReconfigureSummary(config)
+
+            if (state.hasStoredBotToken) {
+                document.getElementById('bot-token').placeholder = 'Stored securely in .env'
+            }
+            if (config.telegram_id) {
+                state.pairedTelegramIdentity = {
+                    telegram_id: config.telegram_id,
+                    telegram_username: config.telegram_username || ''
                 }
-                return;
             }
 
-            if (lastVerifiedToken && typedToken === lastVerifiedToken) return;
-
-            lastVerifiedToken = null;
-            document.getElementById('group-id').value = '';
-            document.getElementById('group-status-note').classList.add('hidden');
-            document.getElementById('btn-verify-token').textContent = 'Connect Bot';
-        });
-
-        // --- TOKEN VALIDATION (non-bootstrap flow) ---
-        const tokenInput = document.getElementById('token-input');
-        const tokenFeedback = document.getElementById('token-feedback');
-        const btnStep1 = document.getElementById('btn-step1');
-
-        let debounceTimer;
-        tokenInput.addEventListener('input', function() {
-            clearTimeout(debounceTimer);
-            const val = this.value.trim();
-            btnStep1.disabled = true;
-            if (val.length < 6) {
-                tokenFeedback.classList.add('hidden');
-                return;
+            if (config.alias) {
+                document.getElementById('alias').value = config.alias
+            } else if (diagnostics.defaults?.alias) {
+                document.getElementById('alias').value = diagnostics.defaults.alias
             }
-            debounceTimer = setTimeout(() => validateToken(val), 600);
-        });
+
+            if (config.scope) {
+                document.getElementById('scope').value = config.scope
+            } else if (diagnostics.defaults?.scope) {
+                document.getElementById('scope').value = diagnostics.defaults.scope
+            }
+
+            document.getElementById('allow-project-changes').checked = config.allow_project_changes !== false
+
+            if (config.agent && config.agent.type) {
+                applyAgentPrefill(config.agent)
+            } else if (diagnostics.recommended_agent) {
+                applyAgentPrefill({ type: diagnostics.recommended_agent })
+            }
+
+            updateAliasHelp()
+            updateStoragePreview()
+            updateAddAgentCommands()
+            renderContextPills()
+            renderFlowCards()
+        }
 
         async function validateToken(token) {
             try {
                 const res = await fetch('/api/validate-token', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({token})
-                });
-                const data = await res.json();
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                })
+                const data = await res.json()
+                const tokenFeedback = document.getElementById('token-feedback')
 
                 if (data.valid) {
-                    tokenFeedback.className = 'feedback success';
-                    tokenFeedback.innerHTML = `✓ Valid Token<br>Role: ${data.role}<br>Scope: ${data.scope}`;
-                    btnStep1.disabled = false;
-                    window.tokenData = {...data, token};
+                    tokenFeedback.className = 'feedback success'
+                    tokenFeedback.innerHTML = `Valid token.<br>Role: ${escapeHtml(data.role)}<br>Scope: ${escapeHtml(data.scope)}`
+                    document.getElementById('btn-flow-join').disabled = false
+                    state.tokenData = { ...data, token }
                     if (data.suggested_alias) {
-                        document.getElementById('alias').value = data.suggested_alias;
-                        updateAliasHelp();
+                        document.getElementById('alias').value = data.suggested_alias
                     }
-                    if (data.scope && data.scope !== '/') document.getElementById('scope').value = data.scope;
+                    if (data.scope && data.scope !== '/') {
+                        document.getElementById('scope').value = data.scope
+                    }
+                    updateAliasHelp()
                 } else {
-                    tokenFeedback.className = 'feedback error';
-                    tokenFeedback.textContent = data.error || 'Invalid token.';
-                    btnStep1.disabled = true;
+                    tokenFeedback.className = 'feedback error'
+                    tokenFeedback.textContent = data.error || 'Invalid token.'
+                    document.getElementById('btn-flow-join').disabled = true
+                    state.tokenData = null
                 }
-                tokenFeedback.classList.remove('hidden');
+
+                tokenFeedback.classList.remove('hidden')
             } catch (err) {
-                tokenFeedback.className = 'feedback error';
-                tokenFeedback.textContent = 'Error connecting to server.';
-                tokenFeedback.classList.remove('hidden');
+                const tokenFeedback = document.getElementById('token-feedback')
+                tokenFeedback.className = 'feedback error'
+                tokenFeedback.textContent = 'Error connecting to server.'
+                tokenFeedback.classList.remove('hidden')
+                document.getElementById('btn-flow-join').disabled = true
+                state.tokenData = null
             }
         }
 
-        // --- NAVIGATION ---
-        const goToStep = (step) => {
-            document.querySelectorAll('.step-panel').forEach(p => p.classList.add('hidden'));
-            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-            document.getElementById(`step-${step}`).classList.remove('hidden');
-            document.querySelector(`.step[data-step="${step}"]`).classList.add('active');
-        };
+        function moveFromFlowToConfig() {
+            if (!state.selectedFlow || state.selectedFlow === 'add-agent') {
+                return
+            }
+            goToStep(2)
+        }
 
-        btnStep1.addEventListener('click', () => goToStep(2));
-        document.getElementById('btn-bootstrap-next').addEventListener('click', () => {
-            window.tokenData = { role: 'OWNER', scope: '/' };
-            goToStep(2);
-        });
-        document.getElementById('btn-back-1').addEventListener('click', () => goToStep(1));
-        document.getElementById('btn-back-2').addEventListener('click', () => goToStep(2));
+        function pickInitialFlow() {
+            const availability = availableFlows()
+            let flow = ''
 
-        // --- STEP 2 PIN VERIFICATION ---
-        document.getElementById('btn-verify-token').addEventListener('click', () => {
-             const token = document.getElementById('bot-token').value.trim();
-             if (!token) {
-                 document.getElementById('token-error').textContent = "Please enter a valid token.";
-                 return;
-             }
-             document.getElementById('token-error').textContent = "";
-             document.getElementById('group-status-note').classList.add('hidden');
-             document.getElementById('btn-verify-token').disabled = true;
-             document.getElementById('btn-verify-token').textContent = "Connecting...";
+            if (availability[state.requestedFlow]) {
+                flow = state.requestedFlow
+            } else if (availability.reconfigure) {
+                flow = 'reconfigure'
+            } else if (availability.bootstrap) {
+                flow = 'bootstrap'
+            } else if (availability.join) {
+                flow = 'join'
+            }
 
-             const pin = Math.floor(1000 + Math.random() * 9000);
-             document.getElementById('pin-display').textContent = `/init ${pin}`;
-             document.getElementById('group-pairing-section').classList.remove('hidden');
+            if (!flow) return
 
-             const statusEl = document.getElementById('pairing-status');
-             statusEl.textContent = "⏳ Waiting for message in Telegram... (Timeout in 60s)";
-             statusEl.style.color = "#666";
+            selectFlow(flow)
 
-             fetch(`/api/await-group-pin?token=${encodeURIComponent(token)}&pin=${pin}`)
-                 .then(res => res.json())
-                 .then(data => {
-                     if (data.success) {
-                         statusEl.textContent = "✅ Group paired successfully!";
-                         statusEl.style.color = "green";
-                         document.getElementById('group-id').value = data.group_id;
-                         lastVerifiedToken = token;
-                         document.getElementById('btn-verify-token').disabled = false;
-                         document.getElementById('btn-verify-token').textContent = "Reconnect Bot";
-                         unlockConfiguration();
-                     } else {
-                         statusEl.textContent = "❌ " + data.error;
-                         statusEl.style.color = "red";
-                         document.getElementById('btn-verify-token').disabled = false;
-                         document.getElementById('btn-verify-token').textContent = "Try Again";
-                     }
-                 })
-                 .catch(err => {
-                     statusEl.textContent = "❌ Network error. Try again.";
-                     document.getElementById('btn-verify-token').disabled = false;
-                     document.getElementById('btn-verify-token').textContent = "Try Again";
-                 });
-        });
+            if (flow === 'reconfigure' && state.requestedFlow === 'reconfigure') {
+                goToStep(2)
+            } else {
+                goToStep(1)
+            }
+        }
 
-        // --- STEP 2 → 3 ---
-        document.getElementById('btn-step2').addEventListener('click', () => {
-            const botToken = document.getElementById('bot-token').value.trim();
-            const useStoredToken = !botToken && hasStoredBotToken;
-            const groupId = parseInt(document.getElementById('group-id').value);
-            let agent = document.querySelector('input[name="agent"]:checked').value;
-            const alias = normalizeAlias(document.getElementById('alias').value);
-            const scope = document.getElementById('scope').value.trim();
-            const syncEnv = document.getElementById('sync-env').checked;
+        async function connectBot() {
+            const tokenError = document.getElementById('token-error')
+            const groupStatusNote = document.getElementById('group-status-note')
+            const token = document.getElementById('bot-token').value.trim()
 
-            let command = null;
-            let vscodeFlavor = null;
+            if (!token) {
+                tokenError.textContent = 'Enter a bot token or keep the stored bot for this instance.'
+                tokenError.className = 'feedback error'
+                tokenError.classList.remove('hidden')
+                return
+            }
+
+            tokenError.classList.add('hidden')
+            groupStatusNote.classList.add('hidden')
+            document.getElementById('btn-verify-token').disabled = true
+            document.getElementById('btn-verify-token').textContent = 'Connecting...'
+
+            const pin = Math.floor(1000 + Math.random() * 9000)
+            document.getElementById('pin-display').textContent = `/init ${pin}`
+            document.getElementById('group-pairing-section').classList.remove('hidden')
+
+            const statusEl = document.getElementById('pairing-status')
+            statusEl.textContent = 'Waiting for message in Telegram...'
+
+            try {
+                const res = await fetch(`/api/await-group-pin?token=${encodeURIComponent(token)}&pin=${pin}`)
+                const data = await res.json()
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to pair bot.')
+                }
+
+                statusEl.textContent = 'Group paired successfully.'
+                document.getElementById('group-id').value = data.group_id
+                state.pairedTelegramIdentity = {
+                    telegram_id: data.telegram_id || 0,
+                    telegram_username: data.telegram_username || ''
+                }
+                state.lastVerifiedToken = token
+                document.getElementById('btn-verify-token').textContent = 'Reconnect Bot'
+            } catch (err) {
+                statusEl.textContent = `Pairing failed: ${err.message || 'Unknown error.'}`
+                tokenError.textContent = err.message || 'Failed to pair bot.'
+                tokenError.className = 'feedback error'
+                tokenError.classList.remove('hidden')
+                document.getElementById('btn-verify-token').textContent = 'Try Again'
+            } finally {
+                document.getElementById('btn-verify-token').disabled = false
+            }
+        }
+
+        function validateConfigurationStep() {
+            const botToken = document.getElementById('bot-token').value.trim()
+            const useStoredToken = !botToken && state.hasStoredBotToken
+            const groupId = parseInt(document.getElementById('group-id').value, 10)
+            let agent = document.querySelector('input[name="agent"]:checked').value
+            const alias = normalizeAlias(document.getElementById('alias').value)
+            const scope = document.getElementById('scope').value.trim()
+            const syncEnv = document.getElementById('sync-env').checked
+            const allowProjectChanges = document.getElementById('allow-project-changes').checked
+
+            let command = null
             if (agent === 'other') {
-                command = document.getElementById('agent-custom').value.trim();
+                command = document.getElementById('agent-custom').value.trim()
             } else if (agent === 'vscode') {
-                vscodeFlavor = document.getElementById('vscode-flavor').value;
-                agent = vscodeFlavor; // Send the specific flavor as agent type
+                agent = document.getElementById('vscode-flavor').value
             }
 
-            if ((!botToken && !useStoredToken) || isNaN(groupId) || !alias || !scope) {
-                alert("Please fill all required fields correctly.");
-                return;
+            if ((!botToken && !useStoredToken) || Number.isNaN(groupId) || !alias || !scope) {
+                alert('Fill the bot connection, alias, and workspace before continuing.')
+                return null
             }
+
             if (alias.length < 3) {
-                alert("Choose a name with at least 3 letters or numbers. Herd will clean it up automatically.");
-                return;
+                alert('Choose a name with at least 3 letters or numbers. Herd will clean it up automatically.')
+                return null
             }
 
-            window.setupData = {
-                bootstrap: isBootstrap,
-                token: isBootstrap ? null : window.tokenData.token,
+            if (state.selectedFlow === 'join' && !state.tokenData?.token) {
+                alert('Validate the invite token before continuing.')
+                return null
+            }
+
+            return {
+                flow: state.selectedFlow,
+                bootstrap: state.selectedFlow === 'bootstrap',
+                token: state.selectedFlow === 'join' ? state.tokenData.token : null,
                 telegram_bot_token: botToken,
                 use_stored_token: useStoredToken,
                 telegram_group_id: groupId,
-                agent: agent,
-                command: command,
-                alias: alias,
-                scope: scope,
-                sync_env: syncEnv
-            };
+                telegram_id: state.pairedTelegramIdentity?.telegram_id || state.currentConfigMeta?.config?.telegram_id || 0,
+                telegram_username: state.pairedTelegramIdentity?.telegram_username || state.currentConfigMeta?.config?.telegram_username || '',
+                agent,
+                command,
+                alias,
+                scope,
+                sync_env: syncEnv,
+                allow_project_changes: allowProjectChanges
+            }
+        }
 
-            const role = isBootstrap ? 'OWNER' : window.tokenData.role;
-            const settingsTarget = syncEnv ? 'config.json + .env' : 'config.json + secure token in .env';
+        function renderReviewSummary(setupData) {
+            const connectionMode = setupData.use_stored_token ? 'Keep stored bot for this instance' : 'Use the bot token typed in this setup'
+            const accessMode = setupData.allow_project_changes ? 'Can change project files' : 'Report-only (.md in .herd/outputs/reports)'
+            const settingsTarget = setupData.sync_env ? 'config + .env kept in sync' : 'config only, token still in .env'
+            const impactText = setupData.flow === 'reconfigure'
+                ? 'This will replace the current local instance settings.'
+                : setupData.flow === 'bootstrap'
+                    ? 'This will create the first owner instance for this install.'
+                    : 'This will create a joined local instance from an invite token.'
 
             document.getElementById('summary').innerHTML = `
-                <p><strong>Role:</strong> ${role}</p>
-                <p><strong>Alias:</strong> @${alias}</p>
-                <p><strong>Agent:</strong> ${agent}</p>
-                <p><strong>Directory:</strong> ${scope}</p>
-                <p><strong>Settings:</strong> ${settingsTarget}</p>
-            `;
+                <div class="metric">
+                    <span class="metric-label">Flow</span>
+                    <span class="metric-value">${escapeHtml(flowLabel(setupData.flow))}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Agent Alias</span>
+                    <span class="metric-value">@${escapeHtml(setupData.alias)}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Agent Type</span>
+                    <span class="metric-value">${escapeHtml(setupData.agent)}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Workspace</span>
+                    <span class="metric-value">${escapeHtml(setupData.scope)}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Connection</span>
+                    <span class="metric-value">${escapeHtml(connectionMode)}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Access</span>
+                    <span class="metric-value">${escapeHtml(accessMode)}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Settings</span>
+                    <span class="metric-value">${escapeHtml(settingsTarget)}</span>
+                </div>
+            `
 
-            updateStoragePreview();
-            goToStep(3);
-        });
+            document.getElementById('review-copy').textContent = impactText
+            updateStoragePreview()
+        }
 
-        // --- FINAL SUBMIT ---
+        async function initialize() {
+            try {
+                const [firstRunRes, configRes] = await Promise.all([
+                    fetch('/api/check-first-run'),
+                    fetch('/api/current-config')
+                ])
+                const firstRun = await firstRunRes.json()
+                const config = await configRes.json()
+                state.isFirstRun = Boolean(firstRun.first_run)
+                applyCurrentConfig(config)
+                pickInitialFlow()
+            } catch (err) {
+                document.getElementById('setup-context-note').textContent = 'Failed to load the setup context. Refresh the page and try again.'
+            }
+        }
+
+        document.querySelectorAll('.flow-card').forEach(card => {
+            card.addEventListener('click', () => selectFlow(card.dataset.flow))
+        })
+
+        document.getElementById('btn-flow-join').addEventListener('click', moveFromFlowToConfig)
+        document.getElementById('btn-flow-bootstrap').addEventListener('click', moveFromFlowToConfig)
+        document.getElementById('btn-flow-reconfigure').addEventListener('click', moveFromFlowToConfig)
+        document.getElementById('replace-instead-button').addEventListener('click', () => {
+            selectFlow('reconfigure')
+            moveFromFlowToConfig()
+        })
+
+        document.getElementById('token-input').addEventListener('input', event => {
+            selectFlow('join')
+            const token = event.target.value.trim()
+            if (token.length < 6) {
+                state.tokenData = null
+                document.getElementById('btn-flow-join').disabled = true
+                document.getElementById('token-feedback').classList.add('hidden')
+                return
+            }
+            clearTimeout(window.herdTokenDebounce)
+            window.herdTokenDebounce = setTimeout(() => validateToken(token), 400)
+        })
+
+        document.getElementById('btn-back-1').addEventListener('click', () => goToStep(1))
+        document.getElementById('btn-back-2').addEventListener('click', () => goToStep(2))
+        document.getElementById('btn-verify-token').addEventListener('click', connectBot)
+        document.getElementById('sync-env').addEventListener('change', updateStoragePreview)
+        document.getElementById('allow-project-changes').addEventListener('change', updateStoragePreview)
+        document.getElementById('alias').addEventListener('input', updateAliasHelp)
+        document.getElementById('new-config-name').addEventListener('input', updateAddAgentCommands)
+        document.getElementById('new-config-name').addEventListener('input', event => {
+            const envInput = document.getElementById('new-env-name')
+            if (!envInput.dataset.userEdited) {
+                envInput.value = suggestedEnvNameFromConfig(event.target.value)
+            }
+            updateAddAgentCommands()
+        })
+        document.getElementById('new-env-name').addEventListener('input', event => {
+            event.target.dataset.userEdited = 'true'
+            updateAddAgentCommands()
+        })
+
+        document.querySelectorAll('input[name="agent"]').forEach(el => {
+            el.addEventListener('change', event => {
+                if (event.target.value === 'vscode') {
+                    toggleAgentExtras('vscode')
+                } else if (event.target.value === 'other') {
+                    toggleAgentExtras('other')
+                } else {
+                    toggleAgentExtras('cli')
+                }
+            })
+        })
+
+        document.getElementById('btn-use-current-scope').addEventListener('click', () => {
+            const suggestedScope = state.currentConfigMeta?.diagnostics?.defaults?.scope
+            if (!suggestedScope) return
+            document.getElementById('scope').value = suggestedScope
+        })
+
+        document.getElementById('btn-use-suggested-alias').addEventListener('click', () => {
+            const suggestedAlias = state.currentConfigMeta?.diagnostics?.defaults?.alias
+            if (!suggestedAlias) return
+            document.getElementById('alias').value = suggestedAlias
+            updateAliasHelp()
+        })
+
+        document.getElementById('bot-token').addEventListener('input', () => {
+            const typedToken = document.getElementById('bot-token').value.trim()
+            if (!typedToken) {
+                state.lastVerifiedToken = null
+                renderConnectionNote(state.currentConfigMeta?.config || {})
+                return
+            }
+            if (state.lastVerifiedToken && typedToken === state.lastVerifiedToken) return
+            state.lastVerifiedToken = null
+            document.getElementById('group-id').value = ''
+            document.getElementById('group-status-note').classList.add('hidden')
+            document.getElementById('btn-verify-token').textContent = 'Connect Bot'
+        })
+
+        document.getElementById('copy-setup-command').addEventListener('click', async () => {
+            const text = document.getElementById('add-agent-setup-command').textContent
+            try {
+                await navigator.clipboard.writeText(text)
+                const feedback = document.getElementById('add-agent-feedback')
+                feedback.className = 'flash success'
+                feedback.textContent = 'Setup command copied. It was not executed. Run it manually in a new terminal inside the Herd directory shown above.'
+                feedback.classList.remove('hidden')
+            } catch (err) {
+                const feedback = document.getElementById('add-agent-feedback')
+                feedback.className = 'flash error'
+                feedback.textContent = 'Could not copy the setup command automatically.'
+                feedback.classList.remove('hidden')
+            }
+        })
+
+        document.getElementById('copy-start-command').addEventListener('click', async () => {
+            const text = document.getElementById('add-agent-start-command').textContent
+            try {
+                await navigator.clipboard.writeText(text)
+                const feedback = document.getElementById('add-agent-feedback')
+                feedback.className = 'flash success'
+                feedback.textContent = 'Start command copied. Run it manually in a new terminal after the second config has been created.'
+                feedback.classList.remove('hidden')
+            } catch (err) {
+                const feedback = document.getElementById('add-agent-feedback')
+                feedback.className = 'flash error'
+                feedback.textContent = 'Could not copy the start command automatically.'
+                feedback.classList.remove('hidden')
+            }
+        })
+
+        document.getElementById('btn-step2').addEventListener('click', () => {
+            const setupData = validateConfigurationStep()
+            if (!setupData) return
+
+            state.setupData = setupData
+            renderReviewSummary(setupData)
+            goToStep(3)
+        })
+
         document.getElementById('btn-start').addEventListener('click', async () => {
-            const btn = document.getElementById('btn-start');
-            btn.disabled = true;
-            btn.textContent = 'Setting up...';
+            if (!state.setupData) return
+
+            const btn = document.getElementById('btn-start')
+            btn.disabled = true
+            btn.textContent = 'Saving...'
 
             try {
                 const res = await fetch('/api/setup', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(window.setupData)
-                });
-                const data = await res.json();
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(state.setupData)
+                })
+                const data = await res.json()
 
-                if (data.success) {
-                    window.location.href = '/dashboard';
-                } else {
-                    alert('Setup failed: ' + data.error);
-                    btn.disabled = false;
-                    btn.textContent = '🐄 Start Herd';
+                if (!data.success) {
+                    throw new Error(data.error || 'Setup failed.')
                 }
+
+                window.location.href = '/dashboard'
             } catch (err) {
-                alert('Network error during setup.');
-                btn.disabled = false;
-                btn.textContent = '🐄 Start Herd';
+                alert(`Setup failed: ${err.message || 'Unknown error.'}`)
+                btn.disabled = false
+                btn.textContent = flowSaveLabel(state.selectedFlow)
             }
-        });
+        })
+
+        initialize()
     </script>
 </body>
 </html>

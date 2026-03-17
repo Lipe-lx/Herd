@@ -6,8 +6,10 @@ import os
 import re
 import secrets
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.parse
@@ -47,6 +49,22 @@ TELEGRAM_MESSAGE_LIMIT = 3600
 TYPING_ACTION_INTERVAL_SECONDS = 4.0
 PROCESSING_NOTICE_DELAY_SECONDS = 1.5
 FEEDBACK_POLL_INTERVAL_SECONDS = 0.05
+REPORT_PREVIEW_LIMIT = 900
+DEFAULT_AGENT_TIMEOUT_SECONDS = 120
+AGENT_TIMEOUT_DEFAULTS = {
+    "gemini": 300,
+}
+RUNTIME_GITIGNORE_PATTERNS = (
+    ".env*",
+    "!.env.example",
+    "config*.json",
+    "!config.example.json",
+    "members.json",
+    "invite_tokens.json",
+    "cron_tasks.json",
+    "cron_history.json",
+)
+RUNTIME_GITIGNORE_HEADER = "# Herd — sensitive runtime files"
 
 AGENT_RESPONSE_POLICY = """You are replying inside a Telegram group through Herd.
 
@@ -58,6 +76,32 @@ Rules for this reply:
 - If the user asked for an exact reply, output exactly that reply and nothing else.
 - Keep the answer concise and Telegram-friendly.
 """
+
+REPORT_ONLY_POLICY = """You are working through Herd in report-only mode.
+
+Rules for this response:
+- Treat the project as read-only and never claim files were changed.
+- Output only Markdown content that can be saved directly as a report.
+- Respond in the same language as the user's latest message.
+- Include short sections for Summary, Affected Areas, Proposed Changes, and Risks or Questions when relevant.
+- If the request is unclear or blocked, explain what is missing in the report itself.
+"""
+
+REPORT_SNAPSHOT_IGNORE_NAMES = {
+    ".git",
+    ".herd",
+    ".next",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".venv",
+    "__pycache__",
+    "build",
+    "coverage",
+    "dist",
+    "node_modules",
+    "venv",
+}
 
 LEADING_META_PATTERNS = (
     re.compile(r"^\s*\[@?[a-z0-9_]+\]\s*$", re.IGNORECASE),
@@ -111,6 +155,7 @@ def save_runtime_config(config: dict, config_path: Path, sync_env: bool = True) 
     env_path = resolve_env_path()
     values = env_values_from_config(config, config_path=config_path, minimal=not sync_env)
     write_env_file(values, env_path=env_path)
+    sync_runtime_gitignore(config_path=config_path, env_path=env_path)
 
     return {
         "config_path": str(config_path),
@@ -147,6 +192,57 @@ def get_current_config_state(config_path: Path) -> dict:
     }
 
 
+def _relative_runtime_gitignore_entry(path: Path, project_root: Path) -> str | None:
+    try:
+        relative_path = path.resolve().relative_to(project_root.resolve())
+    except ValueError:
+        return None
+    return relative_path.as_posix()
+
+
+def sync_runtime_gitignore(
+    *,
+    config_path: Path,
+    env_path: Path,
+    project_root: Path | None = None,
+) -> Path:
+    root = Path(project_root or Path.cwd())
+    gitignore = root / ".gitignore"
+    entries = list(RUNTIME_GITIGNORE_PATTERNS)
+
+    for candidate in (config_path, env_path):
+        entry = _relative_runtime_gitignore_entry(candidate, root)
+        if entry and entry not in entries:
+            entries.append(entry)
+
+    existing_lines: list[str] = []
+    existing_text = ""
+    if gitignore.exists():
+        existing_text = gitignore.read_text(encoding="utf-8")
+        existing_lines = existing_text.splitlines()
+
+    existing_entries = {line.strip() for line in existing_lines if line.strip()}
+    missing_entries = [entry for entry in entries if entry not in existing_entries]
+    header_missing = RUNTIME_GITIGNORE_HEADER not in existing_entries
+
+    if not missing_entries and not header_missing:
+        return gitignore
+
+    updated_text = existing_text
+    if updated_text and not updated_text.endswith("\n"):
+        updated_text += "\n"
+    if updated_text and not updated_text.endswith("\n\n"):
+        updated_text += "\n"
+
+    block: list[str] = []
+    if header_missing:
+        block.append(RUNTIME_GITIGNORE_HEADER)
+    block.extend(missing_entries)
+    updated_text += "\n".join(block) + "\n"
+    gitignore.write_text(updated_text, encoding="utf-8")
+    return gitignore
+
+
 def resolve_ui_landing_path(bridge_state: dict) -> str:
     status = bridge_state.get("status") or {}
     if status.get("setup_complete"):
@@ -171,6 +267,35 @@ def build_public_config(config: dict) -> dict:
     if public.get("invite_token"):
         public["invite_token"] = "[stored privately]"
     return public
+
+
+def allow_project_changes(config: dict) -> bool:
+    return bool(config.get("allow_project_changes", True))
+
+
+def _status_access_mode(config: dict) -> str:
+    return "write-enabled" if allow_project_changes(config) else "report-only"
+
+
+def get_agent_timeout_seconds(config: dict) -> int:
+    raw_value = config.get("agent_timeout_seconds")
+    if raw_value not in (None, ""):
+        try:
+            parsed = int(raw_value)
+            if parsed > 0:
+                return parsed
+        except (TypeError, ValueError):
+            pass
+
+    agent_type = str((config.get("agent") or {}).get("type", "") or "").strip().lower()
+    return AGENT_TIMEOUT_DEFAULTS.get(agent_type, DEFAULT_AGENT_TIMEOUT_SECONDS)
+
+
+def _format_timeout_label(timeout_seconds: int) -> str:
+    if timeout_seconds % 60 == 0:
+        minutes = timeout_seconds // 60
+        return f"{minutes} minute" if minutes == 1 else f"{minutes} minutes"
+    return f"{timeout_seconds} seconds"
 
 
 def is_path_within(parent: Path, child: Path) -> bool:
@@ -238,6 +363,8 @@ def update_runtime_scope(scope: str, bridge_state: dict, sync_env: bool = True) 
     bridge_state.setdefault("status", {})
     bridge_state["status"]["scope"] = config["scope"]
     bridge_state["status"]["alias"] = config.get("alias")
+    bridge_state["status"]["allow_project_changes"] = allow_project_changes(config)
+    bridge_state["status"]["access_mode"] = _status_access_mode(config)
 
     config_ref = bridge_state.get("config_ref")
     if isinstance(config_ref, dict):
@@ -254,6 +381,49 @@ def update_runtime_scope(scope: str, bridge_state: dict, sync_env: bool = True) 
     return {
         "scope": config["scope"],
         "herd_path": str(herd_path),
+        "config_path": saved["config_path"],
+        "env_path": saved["env_path"],
+        "sync_env": saved["sync_env"],
+    }
+
+
+def update_runtime_access_mode(
+    enabled: bool,
+    bridge_state: dict,
+    sync_env: bool = True,
+) -> dict:
+    config_path = Path(bridge_state.get("config_path", Path("config.json")))
+    config = load_config(config_path)
+
+    if not config:
+        raise ValueError("No runtime configuration found. Complete setup first.")
+    if not is_config_complete(config):
+        raise ValueError("Configuration is incomplete. Finish setup before changing access mode.")
+
+    config["allow_project_changes"] = bool(enabled)
+    saved = save_runtime_config(config, config_path, sync_env=sync_env)
+    bootstrap_herd_dir(config["scope"], config)
+
+    bridge_state.setdefault("status", {})
+    bridge_state["status"]["allow_project_changes"] = allow_project_changes(config)
+    bridge_state["status"]["access_mode"] = _status_access_mode(config)
+    bridge_state["status"]["alias"] = config.get("alias")
+    bridge_state["status"]["scope"] = config.get("scope")
+
+    config_ref = bridge_state.get("config_ref")
+    if isinstance(config_ref, dict):
+        config_ref.clear()
+        config_ref.update(config)
+    else:
+        bridge_state["config_ref"] = config
+
+    bot_data_ref = bridge_state.get("bot_data_ref")
+    if isinstance(bot_data_ref, dict):
+        bot_data_ref["config"] = bridge_state["config_ref"]
+
+    return {
+        "allow_project_changes": allow_project_changes(config),
+        "access_mode": _status_access_mode(config),
         "config_path": saved["config_path"],
         "env_path": saved["env_path"],
         "sync_env": saved["sync_env"],
@@ -289,6 +459,8 @@ def bootstrap_herd_dir(scope: str, config: dict) -> None:
         "scope": config["scope"],
         "allowed_scope": config.get("allowed_scope", config["scope"]),
         "cargo": config.get("cargo", "DEV"),
+        "allow_project_changes": allow_project_changes(config),
+        "access_mode": _status_access_mode(config),
         "group_id": config["telegram_group_id"],
         "registered_at": existing_agent.get("registered_at") or datetime.now(timezone.utc).isoformat(),
         "last_active": existing_agent.get("last_active"),
@@ -329,6 +501,51 @@ def persist_message(herd_path: Path, sender: str, text: str) -> None:
     ensure_private_file(log)
 
 
+def upsert_member_registration(config: dict) -> None:
+    telegram_id = config.get("telegram_id")
+    alias = str(config.get("alias", "") or "").strip()
+    if not isinstance(telegram_id, int) or telegram_id <= 0 or not alias:
+        return
+
+    members_file = Path("members.json")
+    members_data = {"members": []}
+    if members_file.exists():
+        ensure_private_file(members_file)
+        try:
+            members_data = json.loads(members_file.read_text(encoding="utf-8"))
+        except Exception:
+            members_data = {"members": []}
+
+    members = list(members_data.get("members", []))
+    member_record = {
+        "telegram_id": telegram_id,
+        "telegram_username": str(config.get("telegram_username", "") or ""),
+        "alias": alias,
+        "agent": (config.get("agent") or {}).get("type", "unknown"),
+        "scope": config.get("scope", ""),
+        "cargo": config.get("cargo", "DEV"),
+        "token_delegation": bool(config.get("cargo") == "OWNER"),
+        "invited_by": "system" if config.get("cargo") == "OWNER" else "ui_setup",
+        "invite_token": config.get("invite_token", ""),
+        "registered_at": datetime.now(timezone.utc).isoformat(),
+        "online": True,
+    }
+
+    existing_idx = next((idx for idx, member in enumerate(members) if member.get("alias") == alias), None)
+    if existing_idx is not None:
+        preserved = dict(members[existing_idx])
+        preserved.update({key: value for key, value in member_record.items() if value not in (None, "")})
+        if "token_delegation" in members[existing_idx]:
+            preserved["token_delegation"] = members[existing_idx]["token_delegation"]
+        if members[existing_idx].get("registered_at"):
+            preserved["registered_at"] = members[existing_idx]["registered_at"]
+        members[existing_idx] = preserved
+    else:
+        members.append(member_record)
+
+    write_private_text(members_file, json.dumps({"members": members}, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
 # --- SUBPROCESS (AGENT) EXECUTION ---
 
 def build_context(herd_path: Path, tail: int = 20) -> str:
@@ -356,6 +573,15 @@ def build_context(herd_path: Path, tail: int = 20) -> str:
 
 def build_agent_prompt(message_text: str, context: str = "") -> str:
     sections = [AGENT_RESPONSE_POLICY.strip()]
+    if context:
+        sections.append(context)
+    sections.append("Latest user message in the Herd group:")
+    sections.append(message_text)
+    return "\n\n".join(section for section in sections if section)
+
+
+def build_report_prompt(message_text: str, context: str = "") -> str:
+    sections = [REPORT_ONLY_POLICY.strip()]
     if context:
         sections.append(context)
     sections.append("Latest user message in the Herd group:")
@@ -429,16 +655,123 @@ def render_telegram_html(text: str) -> str:
     return escaped
 
 
-def call_agent(config: dict, message_text: str, herd_path: Path, context_lines: int = 20) -> str:
-    context = build_context(herd_path, tail=context_lines)
-    prompt = build_agent_prompt(message_text, context)
-
-    agent_cfg = config["agent"]
+def execute_agent_prompt(
+    config: dict,
+    prompt: str,
+    herd_path: Path,
+    *,
+    cwd_override: str | Path | None = None,
+) -> str:
+    agent_cfg = dict(config["agent"])
+    if agent_cfg.get("timeout_seconds") in (None, "") and config.get("agent_timeout_seconds") not in (None, ""):
+        agent_cfg["timeout_seconds"] = config.get("agent_timeout_seconds")
     mode = agent_cfg.get("mode", "cli")
 
     if mode == "file-watcher":
         return _call_agent_filewatcher(agent_cfg, prompt, herd_path)
-    return _call_agent_cli(agent_cfg, prompt, config["scope"])
+    cwd = str(cwd_override or config["scope"])
+    return _call_agent_cli(agent_cfg, prompt, cwd)
+
+
+def call_agent(config: dict, message_text: str, herd_path: Path, context_lines: int = 20) -> str:
+    context = build_context(herd_path, tail=context_lines)
+    prompt = build_agent_prompt(message_text, context)
+    return execute_agent_prompt(config, prompt, herd_path)
+
+
+def _snapshot_copy_ignore(_src: str, names: list[str]) -> set[str]:
+    return {name for name in names if name in REPORT_SNAPSHOT_IGNORE_NAMES}
+
+
+def _prepare_report_snapshot(scope: Path) -> tuple[Path, Path]:
+    temp_root = Path(tempfile.mkdtemp(prefix="herd-report-"))
+    snapshot_root = temp_root / "workspace"
+    shutil.copytree(scope, snapshot_root, ignore=_snapshot_copy_ignore)
+    return temp_root, snapshot_root
+
+
+def call_agent_report_only(config: dict, message_text: str, herd_path: Path, context_lines: int = 20) -> str:
+    context = build_context(herd_path, tail=context_lines)
+    prompt = build_report_prompt(message_text, context)
+    agent_cfg = config["agent"]
+
+    if agent_cfg.get("mode", "cli") != "cli":
+        return "\n".join([
+            "## Summary",
+            "",
+            "This agent is configured in file-watcher mode, so Herd cannot safely enforce report-only execution for it.",
+            "",
+            "## Risks or Questions",
+            "",
+            "- Switch this instance to a CLI agent if you need enforced report-only analysis.",
+            "- The original request is preserved below for manual follow-up.",
+            "",
+            "## Request",
+            "",
+            message_text.strip(),
+        ])
+
+    try:
+        temp_root, snapshot_root = _prepare_report_snapshot(Path(config["scope"]))
+    except Exception as e:
+        return "\n".join([
+            "## Summary",
+            "",
+            "Herd could not prepare a disposable snapshot for report-only execution.",
+            "",
+            "## Risks or Questions",
+            "",
+            f"- Snapshot error: {e}",
+        ])
+
+    try:
+        return execute_agent_prompt(config, prompt, herd_path, cwd_override=snapshot_root)
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
+def write_report_markdown(
+    herd_path: Path,
+    alias: str,
+    message_text: str,
+    report_body: str,
+) -> Path:
+    reports_dir = herd_path / "outputs" / "reports"
+    ensure_private_dir(reports_dir)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    report_path = reports_dir / f"{timestamp}-{alias}.md"
+    markdown = "\n".join([
+        "# Herd Report",
+        "",
+        f"- Agent: @{alias}",
+        f"- Generated At: {datetime.now(timezone.utc).isoformat()}",
+        "- Mode: report-only",
+        "",
+        "## Request",
+        "",
+        message_text.strip(),
+        "",
+        "## Analysis",
+        "",
+        report_body.strip() or "_No report content generated._",
+        "",
+    ])
+    write_private_text(report_path, markdown, encoding="utf-8")
+    return report_path
+
+
+def build_report_telegram_response(report_path: Path, report_body: str) -> str:
+    preview = str(report_body or "").strip()
+    if len(preview) > REPORT_PREVIEW_LIMIT:
+        preview = preview[:REPORT_PREVIEW_LIMIT].rstrip() + "\n\n[...report preview truncated]"
+
+    lines = [
+        "Project changes are disabled for this agent.",
+        f"Markdown report saved to `{report_path}`.",
+    ]
+    if preview:
+        lines.extend(["", "Preview:", preview])
+    return "\n".join(lines)
 
 
 def _resolve_cli_prompt_mode(agent_cfg: dict) -> str:
@@ -456,10 +789,11 @@ def _resolve_cli_prompt_mode(agent_cfg: dict) -> str:
 def _call_agent_cli(agent_cfg: dict, prompt: str, cwd: str) -> str:
     cmd = [agent_cfg["command"]] + agent_cfg.get("args", [])
     prompt_mode = _resolve_cli_prompt_mode(agent_cfg)
+    timeout_seconds = get_agent_timeout_seconds({"agent": agent_cfg, "agent_timeout_seconds": agent_cfg.get("timeout_seconds")})
     run_kwargs = {
         "capture_output": True,
         "text": True,
-        "timeout": 120,
+        "timeout": timeout_seconds,
         "cwd": cwd,
         "input": prompt if prompt_mode == "stdin" else None,
     }
@@ -476,7 +810,7 @@ def _call_agent_cli(agent_cfg: dict, prompt: str, cwd: str) -> str:
         return result.stdout.strip()
 
     except subprocess.TimeoutExpired:
-        return "[Herd] Agent took more than 2 minutes. Please try again."
+        return f"[Herd] Agent took more than {_format_timeout_label(timeout_seconds)}. Please try again."
     except FileNotFoundError:
         return f"[Herd] Agent '{agent_cfg['command']}' not found. Check your installation."
 
@@ -515,9 +849,8 @@ def _call_agent_filewatcher(agent_cfg: dict, prompt: str, herd_path: Path) -> st
     pending.append(task)
     write_private_text(pending_file, json.dumps(pending, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    # Poll for response (up to 2 minutes)
+    timeout = get_agent_timeout_seconds({"agent": agent_cfg, "agent_timeout_seconds": agent_cfg.get("timeout_seconds")})
     response_file = responses_dir / f"{task_id}.txt"
-    timeout = 120
     elapsed = 0
     poll_interval = 2
 
@@ -630,13 +963,17 @@ async def call_agent_with_feedback(
     *,
     message_thread_id: int | None = None,
     reply_to_message_id: int | None = None,
+    runner=None,
 ) -> str:
     result: dict[str, object] = {}
     done = threading.Event()
 
     def run_agent() -> None:
         try:
-            result["value"] = call_agent(config, message_text, herd_path)
+            if runner is not None:
+                result["value"] = runner()
+            else:
+                result["value"] = call_agent(config, message_text, herd_path)
         except Exception as e:
             result["error"] = e
         finally:
@@ -679,7 +1016,7 @@ def should_process(text: str, alias: str, bot_username: str | None = None) -> bo
     return any(trigger in lowered for trigger in triggers)
 
 
-def load_member_registry() -> dict[int, dict]:
+def load_member_registry() -> dict[int, list[dict]]:
     members_file = Path("members.json")
     if not members_file.exists():
         return {}
@@ -690,11 +1027,11 @@ def load_member_registry() -> dict[int, dict]:
     except Exception:
         return {}
 
-    registry: dict[int, dict] = {}
+    registry: dict[int, list[dict]] = {}
     for member in data.get("members", []):
         telegram_id = member.get("telegram_id")
         if isinstance(telegram_id, int):
-            registry[telegram_id] = member
+            registry.setdefault(telegram_id, []).append(member)
     return registry
 
 
@@ -719,27 +1056,47 @@ async def handle_message(update: Update, context):
     if not should_process(text, alias):
         return
 
-    sender_entry = load_member_registry().get(msg.from_user.id)
-    if sender_entry is None:
+    sender_entries = load_member_registry().get(msg.from_user.id, [])
+    if not sender_entries:
         logger.warning(f"[herd] Ignoring message from unregistered sender {msg.from_user.id}.")
         return
 
-    sender = sender_entry.get("alias") or msg.from_user.username or str(msg.from_user.id)
+    sender_aliases = sorted({entry.get("alias", "") for entry in sender_entries if entry.get("alias")})
+    if len(sender_aliases) == 1:
+        sender = sender_aliases[0]
+    else:
+        sender = msg.from_user.username or str(msg.from_user.id)
     logger.info(f"[herd] Processing group message from {sender}: {text[:120]}")
     persist_message(herd_path, sender, text)
 
     message_thread_id = getattr(msg, "message_thread_id", None)
     reply_to_message_id = getattr(msg, "message_id", None)
-    raw_response = await call_agent_with_feedback(
-        context.bot,
-        config["telegram_group_id"],
-        config,
-        text,
-        herd_path,
-        message_thread_id=message_thread_id,
-        reply_to_message_id=reply_to_message_id,
-    )
-    response = finalize_agent_response(raw_response)
+    if allow_project_changes(config):
+        raw_response = await call_agent_with_feedback(
+            context.bot,
+            config["telegram_group_id"],
+            config,
+            text,
+            herd_path,
+            message_thread_id=message_thread_id,
+            reply_to_message_id=reply_to_message_id,
+        )
+        response = finalize_agent_response(raw_response)
+    else:
+        raw_report = await call_agent_with_feedback(
+            context.bot,
+            config["telegram_group_id"],
+            config,
+            text,
+            herd_path,
+            message_thread_id=message_thread_id,
+            reply_to_message_id=reply_to_message_id,
+            runner=lambda: call_agent_report_only(config, text, herd_path),
+        )
+        report_body = finalize_agent_response(raw_report)
+        report_path = write_report_markdown(herd_path, alias, text, report_body)
+        response = build_report_telegram_response(report_path, report_body)
+
     persist_message(herd_path, f"@{alias}", response)
 
     await post_to_group(
@@ -922,7 +1279,19 @@ class HerdUIHandler(BaseHTTPRequestHandler):
                                 text = msg.get("text", "")
                                 if text.strip() == f"/init {pin}":
                                     group_id = msg.get("chat", {}).get("id")
-                                    self._json_response({"success": True, "group_id": group_id})
+                                    sender = msg.get("from", {})
+                                    self._json_response({
+                                        "success": True,
+                                        "group_id": group_id,
+                                        "telegram_id": sender.get("id", 0),
+                                        "telegram_username": sender.get("username", ""),
+                                    })
+                                    self.server.bridge_state["last_pairing"] = {
+                                        "token": token,
+                                        "group_id": group_id,
+                                        "telegram_id": sender.get("id", 0),
+                                        "telegram_username": sender.get("username", ""),
+                                    }
                                     return
                         else:
                             self._json_response({"success": False, "error": "Telegram API error: " + data.get("description", "")})
@@ -959,6 +1328,10 @@ class HerdUIHandler(BaseHTTPRequestHandler):
             self._json_response(result)
         elif path == "/api/update-scope":
             result = self._update_scope(body)
+            status = 200 if result.get("success") else 400
+            self._json_response(result, status=status)
+        elif path == "/api/update-access-mode":
+            result = self._update_access_mode(body)
             status = 200 if result.get("success") else 400
             self._json_response(result, status=status)
         else:
@@ -1059,14 +1432,23 @@ class HerdUIHandler(BaseHTTPRequestHandler):
         is_bootstrap = body.get("bootstrap", False)
         sync_env = body.get("sync_env", True)
         existing_config = load_config(config_path)
+        requested_flow = str(body.get("flow", "") or "").strip().lower()
+        if is_bootstrap or requested_flow == "bootstrap":
+            flow = "bootstrap"
+        elif requested_flow == "reconfigure":
+            flow = "reconfigure"
+        else:
+            flow = "join"
+
         use_stored_token = bool(body.get("use_stored_token"))
         token_value = str(body.get("telegram_bot_token", "") or "").strip()
         if not token_value and use_stored_token:
             token_value = str(existing_config.get("telegram_bot_token", "") or "").strip()
+        last_pairing = self.server.bridge_state.get("last_pairing", {})
 
         # Required fields for all setups
         required = ["agent", "alias", "scope", "telegram_group_id"]
-        if not is_bootstrap:
+        if flow == "join":
             required.append("token")
 
         for field in required:
@@ -1090,14 +1472,37 @@ class HerdUIHandler(BaseHTTPRequestHandler):
             normalized_alias = normalized_alias[:32]
 
         # Determine role
-        if is_bootstrap:
+        if flow == "bootstrap":
             role = "OWNER"
             allowed_scope = requested_scope
+            invite_token = body.get("token", "bootstrap")
+        elif flow == "reconfigure":
+            if not existing_config or not is_config_complete(existing_config):
+                return {"success": False, "error": "No complete instance is available to reconfigure."}
+
+            role = str(existing_config.get("cargo", "DEV") or "DEV")
+            invite_token = existing_config.get("invite_token", "reconfigure")
+            try:
+                existing_allowed_scope = normalize_scope_path(
+                    existing_config.get("allowed_scope") or existing_config.get("scope", "")
+                )
+            except ValueError as e:
+                return {"success": False, "error": f"Invalid current allowed scope: {e}"}
+
+            if role == "OWNER":
+                allowed_scope = requested_scope
+            else:
+                try:
+                    validate_scope_boundary(requested_scope, existing_allowed_scope)
+                except ValueError as e:
+                    return {"success": False, "error": str(e)}
+                allowed_scope = existing_allowed_scope
         else:
             token_data = self._validate_token(body["token"])
             if not token_data.get("valid"):
                 return {"success": False, "error": token_data.get("error")}
             role = token_data.get("role", "DEV")
+            invite_token = body.get("token", "")
             try:
                 allowed_scope = normalize_scope_path(token_data.get("scope", ""))
             except ValueError as e:
@@ -1112,16 +1517,34 @@ class HerdUIHandler(BaseHTTPRequestHandler):
         except ValueError as e:
             return {"success": False, "error": str(e)}
 
+        telegram_id = body.get("telegram_id", existing_config.get("telegram_id", 0))
+        telegram_username = body.get("telegram_username", existing_config.get("telegram_username", ""))
+        if (not telegram_id or int(telegram_id) == 0) and isinstance(last_pairing, dict):
+            if last_pairing.get("group_id") == body.get("telegram_group_id") and last_pairing.get("token") == token_value:
+                telegram_id = last_pairing.get("telegram_id", telegram_id)
+                telegram_username = last_pairing.get("telegram_username", telegram_username)
+
+        agent_timeout_seconds = body.get("agent_timeout_seconds", existing_config.get("agent_timeout_seconds"))
+        if agent_timeout_seconds not in (None, ""):
+            try:
+                agent_timeout_seconds = int(agent_timeout_seconds)
+            except (TypeError, ValueError):
+                return {"success": False, "error": "Agent timeout must be a positive integer."}
+            if agent_timeout_seconds <= 0:
+                return {"success": False, "error": "Agent timeout must be a positive integer."}
+
         config = {
             "telegram_bot_token": token_value,
             "telegram_group_id": body["telegram_group_id"],
-            "telegram_id": body.get("telegram_id", 0),
-            "invite_token": body.get("token", "bootstrap"),
+            "telegram_id": telegram_id,
+            "telegram_username": telegram_username,
+            "invite_token": invite_token,
             "alias": normalized_alias,
             "agent": agent_config,
             "scope": str(requested_scope),
             "allowed_scope": str(allowed_scope),
             "cargo": role,
+            "allow_project_changes": bool(body.get("allow_project_changes", True)),
             "auto_register": True,
             "proactive_events": {
                 "on_commit": False,
@@ -1129,13 +1552,21 @@ class HerdUIHandler(BaseHTTPRequestHandler):
                 "on_pr_open": False
             }
         }
+        if agent_timeout_seconds not in (None, ""):
+            config["agent_timeout_seconds"] = agent_timeout_seconds
 
         try:
             saved = save_runtime_config(config, config_path, sync_env=sync_env)
             bootstrap_herd_dir(config["scope"], config)
+            if flow in {"join", "reconfigure"}:
+                upsert_member_registration(config)
             self.server.bridge_state["herd_path"] = str(Path(config["scope"]) / ".herd")
             self.server.bridge_state["status"]["setup_complete"] = True
             self.server.bridge_state["status"]["alias"] = config["alias"]
+            self.server.bridge_state["status"]["scope"] = config["scope"]
+            self.server.bridge_state["status"]["allow_project_changes"] = allow_project_changes(config)
+            self.server.bridge_state["status"]["access_mode"] = _status_access_mode(config)
+            self.server.bridge_state["config_ref"] = config
             return {
                 "success": True,
                 "config_path": saved["config_path"],
@@ -1165,6 +1596,20 @@ class HerdUIHandler(BaseHTTPRequestHandler):
             return {"success": False, "error": str(e)}
         except Exception as e:
             logger.error(f"Error updating runtime scope: {e}")
+            return {"success": False, "error": str(e)}
+
+    def _update_access_mode(self, body: dict) -> dict:
+        try:
+            updated = update_runtime_access_mode(
+                enabled=bool(body.get("allow_project_changes", True)),
+                bridge_state=self.server.bridge_state,
+                sync_env=body.get("sync_env", True),
+            )
+            return {"success": True, **updated}
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
+        except Exception as e:
+            logger.error(f"Error updating access mode: {e}")
             return {"success": False, "error": str(e)}
 
     def _get_members(self) -> dict:
@@ -1214,9 +1659,31 @@ def start_ui_server(
     open_browser: bool = True,
     initial_path: str | None = None,
 ) -> ThreadingHTTPServer:
-    server = ThreadingHTTPServer(("localhost", UI_PORT), HerdUIHandler)
+    requested_port = UI_PORT
+    raw_env_port = os.getenv("HERD_UI_PORT")
+    if raw_env_port:
+        try:
+            requested_port = int(raw_env_port)
+        except ValueError:
+            logger.warning(f"[herd] Invalid HERD_UI_PORT={raw_env_port!r}; falling back to {UI_PORT}.")
+            requested_port = UI_PORT
+
+    try:
+        server = ThreadingHTTPServer(("localhost", requested_port), HerdUIHandler)
+    except OSError as e:
+        if e.errno != 98:
+            raise
+        logger.warning(
+            f"[herd] UI port {requested_port} is already in use. "
+            "Falling back to a random free local port for this instance."
+        )
+        server = ThreadingHTTPServer(("localhost", 0), HerdUIHandler)
+
     server.bridge_state = bridge_state
     server.ui_auth_token = secrets.token_urlsafe(24)
+    actual_port = int(server.server_address[1])
+    bridge_state.setdefault("status", {})
+    bridge_state["status"]["ui_port"] = actual_port
 
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -1225,7 +1692,7 @@ def start_ui_server(
     if not landing_path.startswith("/"):
         landing_path = f"/{landing_path}"
     separator = "&" if "?" in landing_path else "?"
-    url = f"http://localhost:{UI_PORT}{landing_path}{separator}auth={urllib.parse.quote(server.ui_auth_token)}"
+    url = f"http://localhost:{actual_port}{landing_path}{separator}auth={urllib.parse.quote(server.ui_auth_token)}"
     if open_browser:
         webbrowser.open(url)
         logger.info(f"[herd] Local UI session running at {url}")
@@ -1372,6 +1839,7 @@ def main():
             "scope": scope,
             "cargo": "DEV",
             "telegram_group_id": 0,
+            "allow_project_changes": True,
         })
 
         herd_path = Path(scope) / ".herd"
@@ -1379,6 +1847,8 @@ def main():
         bridge_state["status"]["online"] = True
         bridge_state["status"]["alias"] = "demo_agent"
         bridge_state["status"]["scope"] = scope
+        bridge_state["status"]["allow_project_changes"] = True
+        bridge_state["status"]["access_mode"] = "write-enabled"
 
         server = start_ui_server(bridge_state, open_browser=True, initial_path="/dashboard")
         logger.info("[demo] Dashboard available through the local authenticated UI session.")
@@ -1417,6 +1887,8 @@ def main():
     bridge_state["config_ref"] = config
 
     bootstrap_herd_dir(config["scope"], config)
+    if config.get("auto_register", True):
+        upsert_member_registration(config)
 
     logger.info("Starting Telegram Bot Polling...")
     app = Application.builder().token(config["telegram_bot_token"]).build()
@@ -1429,6 +1901,8 @@ def main():
     bridge_state["status"]["online"] = True
     bridge_state["status"]["alias"] = config["alias"]
     bridge_state["status"]["scope"] = config["scope"]
+    bridge_state["status"]["allow_project_changes"] = allow_project_changes(config)
+    bridge_state["status"]["access_mode"] = _status_access_mode(config)
     
     app.run_polling(allowed_updates=["message"])
 

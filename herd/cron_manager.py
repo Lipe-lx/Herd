@@ -17,7 +17,7 @@ from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, ContextTypes
 
 from .env_loader import load_env
-from .permissions import can_schedule_for, can_remove_task
+from .permissions import ROLE_RANK, can_schedule_for, can_remove_task
 from .storage_security import ensure_private_file, write_private_text
 
 logging.basicConfig(
@@ -55,7 +55,28 @@ def load_history() -> dict: return load_json(HISTORY_FILE, {"runs": []})
 def load_members() -> dict: return load_json(MEMBERS_FILE, {"members": []})
 
 def find_member(telegram_id: int, members: list) -> dict | None:
-    return next((m for m in members if m["telegram_id"] == telegram_id), None)
+    linked_members = [member for member in members if member.get("telegram_id") == telegram_id]
+    if not linked_members:
+        return None
+
+    actor = max(
+        linked_members,
+        key=lambda member: (
+            ROLE_RANK.get(member.get("cargo", ""), 0),
+            1 if member.get("token_delegation") else 0,
+        ),
+    ).copy()
+    actor["aliases"] = sorted({member.get("alias", "") for member in linked_members if member.get("alias")})
+
+    if actor.get("cargo") == "LEAD":
+        highest_rank = ROLE_RANK.get(actor.get("cargo", ""), 0)
+        actor["token_delegation"] = any(
+            member.get("token_delegation")
+            for member in linked_members
+            if ROLE_RANK.get(member.get("cargo", ""), 0) == highest_rank
+        )
+
+    return actor
 
 def get_group_id() -> int | None:
     config = load_json(get_config_file(), {})
@@ -323,7 +344,7 @@ async def handle_cron(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 
 async def cmd_add(update: Update, actor: dict, alias: str, task_desc: str, schedule_str: str) -> None:
-    if not can_schedule_for(actor["cargo"], alias, actor["alias"]):
+    if not can_schedule_for(actor["cargo"], alias, actor.get("aliases") or actor.get("alias")):
         await update.message.reply_text(f"❌ Role {actor['cargo']} cannot schedule tasks for @{alias}.")
         return
 

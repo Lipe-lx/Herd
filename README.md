@@ -11,6 +11,8 @@ Instead of relying on a centralized super-agent, Herd enables a decentralized sw
 - **CRON Scheduler**: Built-in scheduling system using natural language (e.g., `every monday 08:00`).
 - **Interactive UI**: A local setup wizard and status dashboard for your agent.
 - **Isolated Context**: Project code is kept clean. All agent memory and artifacts live in a local `.herd/` directory.
+- **Shared Account Support**: One Telegram account can own multiple Herd agent aliases without losing role-aware permissions.
+- **Report-Only Mode**: Agents can be switched to analysis-only mode, saving Markdown reports under `.herd/outputs/reports/`.
 - **Anti-Loop Architecture**: Agents only respond when explicitly mentioned (`@alias`) or via the `#herd` channel tag.
 
 ---
@@ -94,6 +96,33 @@ If `/init` and `/members` work but normal messages such as `hello @agent_owner` 
 3. Choose your bot.
 4. Select `Disable`.
 
+### How Bots, Agents, and Accounts Relate
+
+Herd uses four concepts that are easy to mix up:
+
+- **Telegram account**: the human user account on Telegram.
+- **Telegram bot**: the BotFather-created bot token that Herd uses to read and send messages.
+- **Herd instance**: one local `config.json` + one running process.
+- **Agent**: the alias and workspace controlled by that specific Herd instance.
+
+What Herd supports today:
+
+- One Telegram account can own multiple agent aliases in the same project or across projects.
+- One running Herd instance controls one active agent at a time.
+- If you want two agents online at the same time, the safe setup is one Herd instance per agent.
+- In practice, that usually means one bot token per active agent instance.
+
+Why this matters:
+
+- Telegram polling conflicts happen when multiple processes use the same bot token at the same time.
+- Herd already avoids that inside a single instance, but it does not yet multiplex several active agents behind one shared bot process.
+
+Example:
+
+- `@maria_dev` on Telegram can be linked to `@agent_backend` and `@agent_qa`.
+- If both agents need to stay online simultaneously, run two separate Herd instances, each with its own bot token.
+- If only one agent will be active, one bot and one Herd instance are enough.
+
 ### 2. Configure Your Agent
 If you use `./start.sh`, Herd opens the setup UI and writes `config.json` for you.
 That is the default onboarding flow and the easiest option for new users.
@@ -113,9 +142,9 @@ Useful variables:
 - `TELEGRAM_BOT_TOKEN` - Bot token for Gatekeeper, CRON, and unified runner.
 - `TELEGRAM_GROUP_ID` - Group ID override.
 - `HERD_ALIAS` / `HERD_SCOPE` / `HERD_CARGO` - Agent identity overrides.
-- `HERD_AGENT_TYPE` / `HERD_AGENT_COMMAND` / `HERD_AGENT_ARGS` / `HERD_AGENT_MODE` / `HERD_AGENT_PROMPT_MODE` - Agent execution overrides.
+- `HERD_AGENT_TYPE` / `HERD_AGENT_COMMAND` / `HERD_AGENT_ARGS` / `HERD_AGENT_MODE` / `HERD_AGENT_PROMPT_MODE` / `HERD_AGENT_TIMEOUT_SECONDS` - Agent execution overrides.
 
-For example, Gemini CLI works best with `HERD_AGENT_ARGS=-p` and `HERD_AGENT_PROMPT_MODE=argv`, because its non-interactive prompt is passed as the argument that follows `-p`.
+For example, Gemini CLI works best with `HERD_AGENT_ARGS=-p` and `HERD_AGENT_PROMPT_MODE=argv`, because its non-interactive prompt is passed as the argument that follows `-p`. If your local model runs take longer, set `HERD_AGENT_TIMEOUT_SECONDS=300` (or add `"agent_timeout_seconds": 300` to `config.json`).
 
 The setup UI now preloads existing values from `config.json` and `.env`, but it never sends the stored bot token back to the browser. By default it keeps non-secret settings synchronized while the bot token stays only in `.env`.
 It also suggests a default alias, pre-fills the current project folder, and auto-selects a detected CLI agent when possible.
@@ -217,6 +246,7 @@ The invited developer then needs to DM the generated `herd-...` token to the Bot
 - `/scope /path/to/project` - Switches this instance to another project directory.
 
 For safety, `/scope` can only be used by the Telegram account linked to that specific local agent instance.
+If the same Telegram account owns multiple aliases, Herd now keeps those assignments separate and only updates the workspace for the alias tied to the running local instance.
 
 ---
 
@@ -255,6 +285,8 @@ While `bridge.py` is running, you can monitor your agent's health, system status
 
 [http://localhost:7474/dashboard](http://localhost:7474/dashboard)
 
+If `7474` is already busy because another Herd instance is open, the UI now automatically falls back to a free local port and prints the exact authenticated URL in the terminal.
+
 The dashboard can also change the active project directory after setup. Update the workspace path there and Herd will:
 - validate the folder
 - update `config.json`
@@ -262,6 +294,10 @@ The dashboard can also change the active project directory after setup. Update t
 - optionally sync the remaining CLI settings to `.env`
 - switch the live agent process to the new working directory
 - create or refresh `.herd/` in the selected project
+
+The dashboard can also toggle whether the agent is allowed to change project files:
+- when enabled, Herd runs the agent normally in the configured workspace
+- when disabled, Herd switches to report-only mode and saves a Markdown summary to `.herd/outputs/reports/`
 
 OWNER instances can move across projects. Invited instances stay constrained to the scope that was delegated to them.
 

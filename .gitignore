@@ -1,11 +1,16 @@
 # Herd — agent workspace
 .herd/
-.env
-config.json
+
+# Herd — sensitive runtime files
+.env*
+!.env.example
+config*.json
+!config.example.json
 members.json
 invite_tokens.json
 cron_tasks.json
 cron_history.json
+
 .venv/
 .agent/
 __pycache__/

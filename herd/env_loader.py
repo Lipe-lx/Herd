@@ -8,6 +8,30 @@ from .storage_security import ensure_private_file, write_private_text
 MINIMAL_ENV_KEYS = ("CONFIG_PATH", "TELEGRAM_BOT_TOKEN")
 PRIVATE_CONFIG_FIELDS = {"telegram_bot_token"}
 
+
+def _parse_bool_env(value: str | None) -> bool | None:
+    if value is None:
+        return None
+
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
+def _parse_positive_int_env(value: str | None) -> int | None:
+    if value is None:
+        return None
+
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+    return parsed if parsed > 0 else None
+
 def resolve_env_path(env_path: str | Path | None = None) -> Path:
     path = Path(env_path or os.getenv("ENV_PATH", ".env"))
     if not path.is_absolute():
@@ -83,11 +107,13 @@ def env_values_from_config(
         "HERD_ALIAS": str(config.get("alias", "") or ""),
         "HERD_SCOPE": str(config.get("scope", "") or ""),
         "HERD_CARGO": str(config.get("cargo", "") or ""),
+        "HERD_ALLOW_PROJECT_CHANGES": "true" if config.get("allow_project_changes", True) else "false",
         "HERD_AGENT_TYPE": str(agent.get("type", "") or ""),
         "HERD_AGENT_COMMAND": str(agent.get("command", "") or ""),
         "HERD_AGENT_ARGS": args_text,
         "HERD_AGENT_MODE": str(agent.get("mode", "") or ""),
         "HERD_AGENT_PROMPT_MODE": str(agent.get("prompt_mode", "") or ""),
+        "HERD_AGENT_TIMEOUT_SECONDS": str(config.get("agent_timeout_seconds", "") or ""),
     }
 
     if minimal:
@@ -111,6 +137,7 @@ def write_env_file(values: dict[str, str], env_path: str | Path | None = None) -
         f"HERD_ALIAS={_quote_env_value(values.get('HERD_ALIAS', ''))}",
         f"HERD_SCOPE={_quote_env_value(values.get('HERD_SCOPE', ''))}",
         f"HERD_CARGO={_quote_env_value(values.get('HERD_CARGO', ''))}",
+        f"HERD_ALLOW_PROJECT_CHANGES={_quote_env_value(values.get('HERD_ALLOW_PROJECT_CHANGES', 'true'))}",
         "",
         "# Agent config overrides",
         f"HERD_AGENT_TYPE={_quote_env_value(values.get('HERD_AGENT_TYPE', ''))}",
@@ -118,6 +145,7 @@ def write_env_file(values: dict[str, str], env_path: str | Path | None = None) -
         f"HERD_AGENT_ARGS={_quote_env_value(values.get('HERD_AGENT_ARGS', ''))}",
         f"HERD_AGENT_MODE={_quote_env_value(values.get('HERD_AGENT_MODE', ''))}",
         f"HERD_AGENT_PROMPT_MODE={_quote_env_value(values.get('HERD_AGENT_PROMPT_MODE', ''))}",
+        f"HERD_AGENT_TIMEOUT_SECONDS={_quote_env_value(values.get('HERD_AGENT_TIMEOUT_SECONDS', ''))}",
         "",
     ]
     return write_private_text(path, "\n".join(content), encoding="utf-8")
@@ -180,5 +208,14 @@ def apply_config_env_overrides(config: dict) -> dict:
 
     if agent:
         merged["agent"] = agent
+
+    if "agent_timeout_seconds" not in merged:
+        parsed_timeout = _parse_positive_int_env(os.getenv("HERD_AGENT_TIMEOUT_SECONDS"))
+        if parsed_timeout is not None:
+            merged["agent_timeout_seconds"] = parsed_timeout
+
+    if "allow_project_changes" not in merged:
+        parsed_bool = _parse_bool_env(os.getenv("HERD_ALLOW_PROJECT_CHANGES"))
+        merged["allow_project_changes"] = True if parsed_bool is None else parsed_bool
 
     return merged

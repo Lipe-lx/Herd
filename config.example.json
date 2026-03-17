@@ -12,6 +12,8 @@
   "scope": "/absolute/path/to/project",
   "allowed_scope": "/absolute/path/to/project",
   "cargo": "DEV",
+  "allow_project_changes": true,
+  "agent_timeout_seconds": 300,
   "auto_register": true,
   "proactive_events": {
     "on_commit": false,

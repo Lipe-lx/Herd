@@ -74,9 +74,18 @@ def main() -> None:
 
     herd_path = Path(config["scope"]) / ".herd"
     bridge.bootstrap_herd_dir(config["scope"], config)
+    if config.get("auto_register", True):
+        bridge.upsert_member_registration(config)
 
     bridge_state = {
-        "status": {"online": True, "setup_complete": True, "alias": config["alias"], "scope": config["scope"]},
+        "status": {
+            "online": True,
+            "setup_complete": True,
+            "alias": config["alias"],
+            "scope": config["scope"],
+            "allow_project_changes": bridge.allow_project_changes(config),
+            "access_mode": bridge._status_access_mode(config),
+        },
         "herd_path": str(herd_path),
         "config_path": args.config,
         "config_ref": config,

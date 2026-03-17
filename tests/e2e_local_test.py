@@ -27,11 +27,13 @@ ENV_KEYS = [
     "HERD_ALIAS",
     "HERD_SCOPE",
     "HERD_CARGO",
+    "HERD_ALLOW_PROJECT_CHANGES",
     "HERD_AGENT_TYPE",
     "HERD_AGENT_COMMAND",
     "HERD_AGENT_ARGS",
     "HERD_AGENT_MODE",
     "HERD_AGENT_PROMPT_MODE",
+    "HERD_AGENT_TIMEOUT_SECONDS",
 ]
 
 
@@ -122,6 +124,7 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
             "scope": str(self.scope),
             "allowed_scope": str(self.scope),
             "cargo": "DEV",
+            "allow_project_changes": True,
             "auto_register": True,
             "proactive_events": {
                 "on_commit": False,
@@ -178,7 +181,9 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
 
     def test_env_only_config_and_config_file_precedence(self):
         env_path = Path(self.tmpdir.name) / ".env"
-        write_env_file(env_values_from_config(self.config, config_path=Path("missing-config.json")), env_path=env_path)
+        config_with_timeout = dict(self.config)
+        config_with_timeout["agent_timeout_seconds"] = 240
+        write_env_file(env_values_from_config(config_with_timeout, config_path=Path("missing-config.json")), env_path=env_path)
         os.environ["ENV_PATH"] = str(env_path)
         load_env()
 
@@ -186,6 +191,7 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(bridge.is_config_complete(env_only_config))
         self.assertEqual(env_only_config["alias"], "agent_dev")
         self.assertEqual(env_only_config["telegram_group_id"], -100123)
+        self.assertEqual(env_only_config["agent_timeout_seconds"], 240)
 
         file_config = dict(self.config)
         file_config["alias"] = "from_file"
@@ -194,7 +200,7 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
         merged = bridge.load_config(Path("file-config.json"))
         self.assertEqual(merged["alias"], "from_file")
 
-        saved = bridge.save_runtime_config(self.config, Path("saved-config.json"), sync_env=True)
+        saved = bridge.save_runtime_config(config_with_timeout, Path("saved-config.json"), sync_env=True)
         self.assertTrue(Path(saved["config_path"]).exists())
         self.assertTrue(Path(saved["env_path"]).exists())
 
@@ -203,6 +209,30 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
 
         saved_env = Path(saved["env_path"]).read_text(encoding="utf-8")
         self.assertIn("TELEGRAM_BOT_TOKEN=test-token", saved_env)
+        self.assertIn("HERD_ALLOW_PROJECT_CHANGES=true", saved_env)
+        self.assertIn("HERD_AGENT_TIMEOUT_SECONDS=240", saved_env)
+
+    def test_save_runtime_config_updates_gitignore_for_sensitive_instance_files(self):
+        os.environ["ENV_PATH"] = str(Path("runtime") / "second-agent.env")
+
+        saved = bridge.save_runtime_config(
+            self.config,
+            Path("instances") / "second-agent.runtime.json",
+            sync_env=True,
+        )
+
+        self.assertTrue(Path(saved["config_path"]).exists())
+        self.assertTrue(Path(saved["env_path"]).exists())
+
+        gitignore = Path(".gitignore").read_text(encoding="utf-8")
+        self.assertIn(".env*", gitignore)
+        self.assertIn("!.env.example", gitignore)
+        self.assertIn("config*.json", gitignore)
+        self.assertIn("!config.example.json", gitignore)
+        self.assertIn("members.json", gitignore)
+        self.assertIn("invite_tokens.json", gitignore)
+        self.assertIn("instances/second-agent.runtime.json", gitignore)
+        self.assertIn("runtime/second-agent.env", gitignore)
 
     def test_cli_agent_uses_stdin_by_default(self):
         completed = mock.Mock(returncode=0, stdout="ok via stdin", stderr="")
@@ -219,6 +249,7 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response, "ok via stdin")
         self.assertEqual(run_mock.call_args.args[0], ["claude", "--print"])
         self.assertEqual(run_mock.call_args.kwargs["input"], "responda ok")
+        self.assertEqual(run_mock.call_args.kwargs["timeout"], 120)
 
     def test_cli_agent_uses_argv_when_prompt_flag_is_present(self):
         completed = mock.Mock(returncode=0, stdout="ok via argv", stderr="")
@@ -237,6 +268,22 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(run_mock.call_args.args[0], ["gemini", "-p", "responda ok"])
         self.assertIsNone(run_mock.call_args.kwargs["input"])
         self.assertEqual(run_mock.call_args.kwargs["stdin"], bridge.subprocess.DEVNULL)
+        self.assertEqual(run_mock.call_args.kwargs["timeout"], 300)
+
+    def test_execute_agent_prompt_applies_top_level_timeout_override(self):
+        completed = mock.Mock(returncode=0, stdout="ok override", stderr="")
+        config = dict(self.config)
+        config["agent_timeout_seconds"] = 45
+
+        with mock.patch("bridge.subprocess.run", return_value=completed) as run_mock:
+            response = bridge.execute_agent_prompt(
+                config,
+                "responda ok",
+                Path(self.config["scope"]) / ".herd",
+            )
+
+        self.assertEqual(response, "ok override")
+        self.assertEqual(run_mock.call_args.kwargs["timeout"], 45)
 
     def test_build_agent_prompt_enforces_same_language_and_final_answer_only(self):
         prompt = bridge.build_agent_prompt(
@@ -379,6 +426,94 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent_cfg["command"], "my-agent")
         self.assertEqual(agent_cfg["args"], ["--run", "hello world"])
 
+    def test_setup_reconfigure_flow_does_not_require_invite_token(self):
+        self.config["cargo"] = "OWNER"
+        self.config["alias"] = "agent_owner"
+        self.config["telegram_id"] = self.owner.id
+        Path("config.json").write_text(json.dumps(self.config, indent=2), encoding="utf-8")
+
+        handler = object.__new__(bridge.HerdUIHandler)
+        handler.server = mock.Mock(bridge_state={"config_path": Path("config.json"), "status": {}})
+
+        result = handler._run_setup({
+            "flow": "reconfigure",
+            "bootstrap": False,
+            "use_stored_token": True,
+            "sync_env": False,
+            "telegram_group_id": self.config["telegram_group_id"],
+            "agent": "codex",
+            "alias": "agent_reconfigured",
+            "scope": str(self.scope),
+            "allow_project_changes": True,
+        })
+
+        self.assertTrue(result["success"])
+        saved_config = json.loads(Path("config.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved_config["alias"], "agent_reconfigured")
+        self.assertEqual(saved_config["cargo"], "OWNER")
+
+    def test_setup_uses_last_pairing_identity_when_body_does_not_include_telegram_id(self):
+        handler = object.__new__(bridge.HerdUIHandler)
+        handler.server = mock.Mock(bridge_state={
+            "config_path": Path("config.second-agent.json"),
+            "status": {},
+            "last_pairing": {
+                "token": "test-bot-token",
+                "group_id": self.config["telegram_group_id"],
+                "telegram_id": self.dev.id,
+                "telegram_username": self.dev.username,
+            },
+        })
+
+        with mock.patch.object(
+            bridge.HerdUIHandler,
+            "_validate_token",
+            return_value={"valid": True, "role": "DEV", "scope": str(self.scope)},
+        ):
+            result = handler._run_setup({
+                "flow": "join",
+                "bootstrap": False,
+                "token": "herd-test-token",
+                "telegram_bot_token": "test-bot-token",
+                "telegram_group_id": self.config["telegram_group_id"],
+                "agent": "codex",
+                "alias": "agent_dev",
+                "scope": str(self.scope),
+                "allow_project_changes": True,
+                "sync_env": False,
+            })
+
+        self.assertTrue(result["success"])
+        saved_config = json.loads(Path("config.second-agent.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved_config["telegram_id"], self.dev.id)
+        members = gatekeeper.load_members()["members"]
+        self.assertTrue(any(member["alias"] == "agent_dev" and member["telegram_id"] == self.dev.id for member in members))
+
+    def test_upsert_member_registration_updates_existing_alias(self):
+        bridge.upsert_member_registration({
+            "telegram_id": self.owner.id,
+            "telegram_username": self.owner.username,
+            "alias": "agent_owner",
+            "agent": {"type": "gemini"},
+            "scope": self.config["scope"],
+            "cargo": "OWNER",
+            "invite_token": "bootstrap",
+        })
+        bridge.upsert_member_registration({
+            "telegram_id": self.owner.id,
+            "telegram_username": self.owner.username,
+            "alias": "agent_owner",
+            "agent": {"type": "codex"},
+            "scope": "/new-scope",
+            "cargo": "OWNER",
+            "invite_token": "bootstrap",
+        })
+
+        members = gatekeeper.load_members()["members"]
+        self.assertEqual(len(members), 1)
+        self.assertEqual(members[0]["agent"], "codex")
+        self.assertEqual(members[0]["scope"], "/new-scope")
+
     def test_ui_landing_path_prefers_dashboard_when_configured(self):
         bridge_state = {
             "status": {"setup_complete": True},
@@ -400,6 +535,52 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
         }
 
         self.assertEqual(bridge.resolve_ui_landing_path(bridge_state), "/setup")
+
+    def test_start_ui_server_falls_back_to_free_port_when_default_is_busy(self):
+        busy_error = OSError(98, "Address already in use")
+        fallback_server = mock.Mock()
+        fallback_server.server_address = ("127.0.0.1", 38123)
+
+        with mock.patch("bridge.ThreadingHTTPServer", side_effect=[busy_error, fallback_server]) as server_mock, \
+             mock.patch("bridge.threading.Thread") as thread_mock, \
+             mock.patch("bridge.secrets.token_urlsafe", return_value="test-auth-token"):
+            thread_instance = mock.Mock()
+            thread_mock.return_value = thread_instance
+
+            bridge_state = {"status": {}, "config_path": Path("config.json"), "config_ref": dict(self.config)}
+            server = bridge.start_ui_server(bridge_state, open_browser=False, initial_path="/setup")
+
+        self.assertIs(server, fallback_server)
+        self.assertEqual(bridge_state["status"]["ui_port"], 38123)
+        self.assertEqual(server_mock.call_args_list[0].args[0], ("localhost", bridge.UI_PORT))
+        self.assertEqual(server_mock.call_args_list[1].args[0], ("localhost", 0))
+        thread_mock.assert_called_once()
+        thread_instance.start.assert_called_once()
+
+    def test_upsert_member_registration_adds_second_alias_for_same_account(self):
+        bridge.upsert_member_registration({
+            "telegram_id": self.owner.id,
+            "telegram_username": self.owner.username,
+            "alias": "agent_owner",
+            "agent": {"type": "gemini"},
+            "scope": self.config["scope"],
+            "cargo": "OWNER",
+            "invite_token": "bootstrap",
+        })
+        bridge.upsert_member_registration({
+            "telegram_id": self.owner.id,
+            "telegram_username": self.owner.username,
+            "alias": "agent_dev",
+            "agent": {"type": "codex"},
+            "scope": self.config["scope"],
+            "cargo": "DEV",
+            "invite_token": "herd-join",
+        })
+
+        members = gatekeeper.load_members()["members"]
+        self.assertEqual(len(members), 2)
+        self.assertEqual({member["alias"] for member in members}, {"agent_owner", "agent_dev"})
+        self.assertEqual({member["telegram_id"] for member in members}, {self.owner.id})
 
     def test_update_runtime_scope_keeps_live_config_and_env_in_sync(self):
         new_scope = Path(self.tmpdir.name) / "other-project"
@@ -443,6 +624,7 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent_metadata["scope"], str(new_scope))
         self.assertEqual(agent_metadata["alias"], self.config["alias"])
         self.assertEqual(agent_metadata["allowed_scope"], str(new_scope))
+        self.assertTrue(agent_metadata["allow_project_changes"])
 
     def test_update_runtime_scope_rejects_non_owner_outside_allowed_scope(self):
         new_scope = Path(self.tmpdir.name) / "outside-scope"
@@ -564,6 +746,52 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
         saved_config = json.loads(Path("config.json").read_text(encoding="utf-8"))
         self.assertEqual(saved_config["scope"], self.config["scope"])
 
+    async def test_admin_commands_are_ignored_by_lower_role_instance_on_shared_account(self):
+        self.config["cargo"] = "DEV"
+        self.config["alias"] = "agent_dev"
+        self.config["telegram_id"] = self.owner.id
+        Path("config.json").write_text(json.dumps(self.config, indent=2), encoding="utf-8")
+        gatekeeper.save_members({
+            "members": [
+                {
+                    "telegram_id": self.owner.id,
+                    "telegram_username": self.owner.username,
+                    "alias": "agent_owner",
+                    "agent": "gemini",
+                    "scope": self.config["scope"],
+                    "cargo": "OWNER",
+                    "token_delegation": True,
+                    "invited_by": "system",
+                    "invite_token": "bootstrap",
+                    "registered_at": "now",
+                    "online": True,
+                },
+                {
+                    "telegram_id": self.owner.id,
+                    "telegram_username": self.owner.username,
+                    "alias": "agent_dev",
+                    "agent": "codex",
+                    "scope": self.config["scope"],
+                    "cargo": "DEV",
+                    "token_delegation": False,
+                    "invited_by": "agent_owner",
+                    "invite_token": "herd-test",
+                    "registered_at": "now",
+                    "online": True,
+                },
+            ]
+        })
+
+        members_message = FakeMessage("/members", self.group_chat, self.owner)
+        invite_message = FakeMessage(f"/invite @agent_new role=DEV scope={self.scope}", self.group_chat, self.owner)
+
+        await gatekeeper.dispatch_command(FakeUpdate(members_message), FakeContext(self.bot))
+        await gatekeeper.dispatch_command(FakeUpdate(invite_message), FakeContext(self.bot))
+
+        self.assertFalse(members_message.replies)
+        self.assertFalse(invite_message.replies)
+        self.assertEqual(gatekeeper.load_tokens()["tokens"], [])
+
     async def test_group_init_bootstraps_owner_from_runtime_config(self):
         self.config["cargo"] = "OWNER"
         self.config["alias"] = "agent_owner"
@@ -588,6 +816,20 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(init_message.replies)
         self.assertIn("Herd initialized", init_message.replies[-1]["text"])
+
+    async def test_group_init_is_silently_ignored_by_non_owner_instance(self):
+        self.config["cargo"] = "DEV"
+        self.config["alias"] = "agent_dev"
+        Path("config.json").write_text(json.dumps(self.config, indent=2), encoding="utf-8")
+
+        init_message = FakeMessage(
+            text="/init 8703",
+            chat=self.group_chat,
+            from_user=self.dev,
+        )
+        await gatekeeper.dispatch_command(FakeUpdate(init_message), FakeContext(self.bot))
+
+        self.assertFalse(init_message.replies)
 
     def test_public_config_state_redacts_bot_token(self):
         state = bridge.get_current_config_state(Path("config.json"))
@@ -780,6 +1022,248 @@ class HerdLocalE2ETest(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(invite_message.replies)
         self.assertIn("allowed scope", invite_message.replies[-1]["text"])
+
+    async def test_shared_telegram_account_uses_highest_role_for_invites(self):
+        self.config["cargo"] = "LEAD"
+        self.config["alias"] = "agent_lead"
+        self.config["telegram_id"] = self.owner.id
+        Path("config.json").write_text(json.dumps(self.config, indent=2), encoding="utf-8")
+        gatekeeper.save_members({
+            "members": [
+                {
+                    "telegram_id": self.owner.id,
+                    "telegram_username": self.owner.username,
+                    "alias": "agent_dev",
+                    "agent": "codex",
+                    "scope": self.config["scope"],
+                    "cargo": "DEV",
+                    "token_delegation": False,
+                    "invited_by": "system",
+                    "invite_token": "bootstrap",
+                    "registered_at": "now",
+                    "online": True,
+                },
+                {
+                    "telegram_id": self.owner.id,
+                    "telegram_username": self.owner.username,
+                    "alias": "agent_lead",
+                    "agent": "codex",
+                    "scope": self.config["scope"],
+                    "cargo": "LEAD",
+                    "token_delegation": True,
+                    "invited_by": "system",
+                    "invite_token": "bootstrap",
+                    "registered_at": "now",
+                    "online": True,
+                },
+            ]
+        })
+
+        invite_message = FakeMessage(
+            text=f"/invite @agent_new role=DEV scope={self.scope}",
+            chat=self.group_chat,
+            from_user=self.owner,
+        )
+
+        await gatekeeper.dispatch_command(FakeUpdate(invite_message), FakeContext(self.bot))
+
+        self.assertTrue(invite_message.replies)
+        self.assertIn("Token generated", invite_message.replies[-1]["text"])
+        self.assertEqual(len(gatekeeper.load_tokens()["tokens"]), 1)
+
+    async def test_scope_command_updates_only_runtime_alias_for_shared_account(self):
+        self.config["cargo"] = "OWNER"
+        self.config["alias"] = "agent_owner"
+        self.config["telegram_id"] = self.owner.id
+        Path("config.json").write_text(json.dumps(self.config, indent=2), encoding="utf-8")
+        gatekeeper.save_members({
+            "members": [
+                {
+                    "telegram_id": self.owner.id,
+                    "telegram_username": self.owner.username,
+                    "alias": "agent_owner",
+                    "agent": "gemini",
+                    "scope": self.config["scope"],
+                    "cargo": "OWNER",
+                    "token_delegation": True,
+                    "invited_by": "system",
+                    "invite_token": "bootstrap",
+                    "registered_at": "now",
+                    "online": True,
+                },
+                {
+                    "telegram_id": self.owner.id,
+                    "telegram_username": self.owner.username,
+                    "alias": "agent_qa",
+                    "agent": "codex",
+                    "scope": "/unchanged-scope",
+                    "cargo": "QA",
+                    "token_delegation": False,
+                    "invited_by": "agent_owner",
+                    "invite_token": "herd-test",
+                    "registered_at": "now",
+                    "online": True,
+                },
+            ]
+        })
+
+        env_path = Path(self.tmpdir.name) / ".env"
+        os.environ["ENV_PATH"] = str(env_path)
+
+        live_config = json.loads(Path("config.json").read_text(encoding="utf-8"))
+        bot_data = {
+            "config": live_config,
+            "herd_path": Path(self.config["scope"]) / ".herd",
+        }
+        bridge_state = {
+            "config_path": Path("config.json"),
+            "config_ref": live_config,
+            "bot_data_ref": bot_data,
+            "status": {"online": True, "setup_complete": True, "alias": "agent_owner", "scope": self.config["scope"]},
+            "herd_path": str(Path(self.config["scope"]) / ".herd"),
+        }
+        bot_data["bridge_state"] = bridge_state
+
+        new_scope = Path(self.tmpdir.name) / "shared-account-scope"
+        new_scope.mkdir(parents=True, exist_ok=True)
+        message = FakeMessage(f"/scope {new_scope}", self.group_chat, self.owner)
+
+        await gatekeeper.dispatch_command(FakeUpdate(message), FakeContext(self.bot, bot_data=bot_data))
+
+        members = gatekeeper.load_members()["members"]
+        owner_entry = next(member for member in members if member["alias"] == "agent_owner")
+        qa_entry = next(member for member in members if member["alias"] == "agent_qa")
+        self.assertEqual(owner_entry["scope"], str(new_scope))
+        self.assertEqual(qa_entry["scope"], "/unchanged-scope")
+
+    async def test_cron_allows_shared_account_to_schedule_for_owned_alias(self):
+        gatekeeper.save_members({
+            "members": [
+                {
+                    "telegram_id": self.dev.id,
+                    "telegram_username": self.dev.username,
+                    "alias": "agent_dev",
+                    "agent": "codex",
+                    "scope": self.config["scope"],
+                    "cargo": "DEV",
+                    "token_delegation": False,
+                    "invited_by": "owner",
+                    "invite_token": "herd-test",
+                    "registered_at": "now",
+                    "online": True,
+                },
+                {
+                    "telegram_id": self.dev.id,
+                    "telegram_username": self.dev.username,
+                    "alias": "agent_qa",
+                    "agent": "codex",
+                    "scope": self.config["scope"],
+                    "cargo": "QA",
+                    "token_delegation": False,
+                    "invited_by": "owner",
+                    "invite_token": "herd-test",
+                    "registered_at": "now",
+                    "online": True,
+                },
+            ]
+        })
+
+        add_message = FakeMessage(
+            text='/cron add @agent_qa "run shared audit" * * * * *',
+            chat=self.group_chat,
+            from_user=self.dev,
+        )
+
+        await cron_manager.handle_cron(FakeUpdate(add_message), FakeContext(self.bot))
+
+        self.assertTrue(add_message.replies)
+        self.assertIn("Task Scheduled", add_message.replies[-1]["text"])
+        tasks = cron_manager.load_tasks()["tasks"]
+        self.assertEqual(tasks[0]["alias"], "agent_qa")
+
+    async def test_bridge_report_only_writes_markdown_report(self):
+        self.config["allow_project_changes"] = False
+        Path("config.json").write_text(json.dumps(self.config, indent=2), encoding="utf-8")
+        gatekeeper.save_members({
+            "members": [{
+                "telegram_id": self.dev.id,
+                "telegram_username": self.dev.username,
+                "alias": "agent_dev",
+                "agent": "codex",
+                "scope": self.config["scope"],
+                "cargo": "DEV",
+                "token_delegation": False,
+                "invited_by": "owner",
+                "invite_token": "herd-test",
+                "registered_at": "now",
+                "online": True,
+            }]
+        })
+
+        original_report_call = bridge.call_agent_report_only
+        bridge.call_agent_report_only = lambda config, message_text, herd_path, context_lines=20: (
+            "## Summary\n\nSem permissão para alterar o projeto.\n\n## Proposed Changes\n\n- Ajustar auth\n- Criar testes"
+        )
+        try:
+            context = FakeContext(
+                self.bot,
+                bot_data={
+                    "config": self.config,
+                    "herd_path": Path(self.config["scope"]) / ".herd",
+                },
+            )
+            message = FakeMessage(
+                text="@agent_dev revise esse fluxo sem escrever",
+                chat=self.group_chat,
+                from_user=self.dev,
+            )
+
+            await bridge.handle_message(FakeUpdate(message), context)
+        finally:
+            bridge.call_agent_report_only = original_report_call
+
+        reports = sorted((Path(self.config["scope"]) / ".herd" / "outputs" / "reports").glob("*.md"))
+        self.assertEqual(len(reports), 1)
+        report_text = reports[0].read_text(encoding="utf-8")
+        self.assertIn("# Herd Report", report_text)
+        self.assertIn("## Request", report_text)
+        self.assertIn("Sem permissão para alterar o projeto.", report_text)
+
+        sent = self.bot.sent_messages[-1]
+        self.assertIn("Project changes are disabled", sent["text"])
+        self.assertIn(".md", sent["text"])
+
+    def test_update_runtime_access_mode_updates_config_and_env(self):
+        env_path = Path(self.tmpdir.name) / ".env"
+        os.environ["ENV_PATH"] = str(env_path)
+
+        live_config = dict(self.config)
+        bot_data = {
+            "config": live_config,
+            "herd_path": Path(self.config["scope"]) / ".herd",
+        }
+        bridge_state = {
+            "config_path": Path("config.json"),
+            "config_ref": live_config,
+            "bot_data_ref": bot_data,
+            "status": {"online": True, "setup_complete": True, "alias": self.config["alias"], "scope": self.config["scope"]},
+            "herd_path": str(Path(self.config["scope"]) / ".herd"),
+        }
+
+        updated = bridge.update_runtime_access_mode(False, bridge_state, sync_env=True)
+
+        saved_config = json.loads(Path("config.json").read_text(encoding="utf-8"))
+        self.assertFalse(saved_config["allow_project_changes"])
+        self.assertFalse(live_config["allow_project_changes"])
+        self.assertEqual(updated["access_mode"], "report-only")
+        self.assertFalse(bridge_state["status"]["allow_project_changes"])
+
+        env_contents = env_path.read_text(encoding="utf-8")
+        self.assertIn("HERD_ALLOW_PROJECT_CHANGES=false", env_contents)
+
+        agent_metadata = json.loads((Path(self.config["scope"]) / ".herd" / "agent.json").read_text(encoding="utf-8"))
+        self.assertFalse(agent_metadata["allow_project_changes"])
+        self.assertEqual(agent_metadata["access_mode"], "report-only")
 
     async def _bootstrap_owner(self):
         join_message = FakeMessage(

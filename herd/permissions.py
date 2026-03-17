@@ -1,10 +1,18 @@
 ROLE_RANK = {"OWNER": 4, "LEAD": 3, "DEV": 2, "QA": 2, "VIEWER": 1}
 
-def can_schedule_for(actor_role: str, target_alias: str, actor_alias: str) -> bool:
+def _normalize_aliases(actor_aliases) -> set[str]:
+    if isinstance(actor_aliases, str):
+        return {actor_aliases}
+    if actor_aliases is None:
+        return set()
+    return {str(alias) for alias in actor_aliases if alias}
+
+
+def can_schedule_for(actor_role: str, target_alias: str, actor_aliases) -> bool:
     """OWNER and LEAD can schedule for anyone. DEV/QA only for themselves."""
     if ROLE_RANK.get(actor_role, 0) >= 3:
         return True
-    return actor_alias == target_alias
+    return target_alias in _normalize_aliases(actor_aliases)
 
 def can_generate_token(actor: dict) -> bool:
     """OWNER always can. LEAD only if token_delegation is True."""
@@ -26,7 +34,8 @@ def can_modify_cargo(actor_role: str, target_role: str) -> bool:
 
 def can_remove_task(actor: dict, task: dict) -> bool:
     # Creator can always remove their own task
-    if actor["alias"] == task["created_by"]:
+    actor_aliases = _normalize_aliases(actor.get("aliases") or actor.get("alias"))
+    if task["created_by"] in actor_aliases:
         return True
     # OWNER and LEAD can remove any task
     return actor["cargo"] in ("OWNER", "LEAD")
